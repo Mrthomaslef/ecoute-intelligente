@@ -1,0 +1,22 @@
+#!/bin/zsh
+# Bouton marche/arrêt du mode consultation (appelé par les apps « Écoute Consultation » / « Écoute RCP »).
+# 1er clic : ouvre le Terminal et lance l'écoute. 2e clic : termine l'écoute (comme Ctrl+C).
+TYPE="${1:-cr}"
+DIR="${0:A:h:h}"
+PIDF="${ECOUTE_DOSSIER:-$HOME/EcouteIntelligente}/.consultation.pid"
+notifier() { osascript -e "display notification \"$1\" with title \"Écoute intelligente\"" 2>/dev/null; }
+
+PID=$(cat "$PIDF" 2>/dev/null)
+if [[ -n "$PID" ]] && kill -0 "$PID" 2>/dev/null; then
+  kill -INT "$PID"
+  notifier "Fin de l'écoute : transcription finale en cours, la note va s'ouvrir."
+else
+  LANCEUR="$DIR/.lanceur-$TYPE.command"
+  print -r -- "#!/bin/zsh
+clear
+'$DIR/bin/ecoute' consultation --type $TYPE
+echo; echo 'Terminé. Vous pouvez fermer cette fenêtre.'" > "$LANCEUR"
+  chmod +x "$LANCEUR"
+  open -a Terminal "$LANCEUR"
+  notifier "Écoute en cours ($TYPE). Recliquez sur le bouton pour terminer."
+fi

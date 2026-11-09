@@ -7,6 +7,7 @@ Tout reste sur le Mac ; l'audio est sauvegardé en continu (rien n'est perdu en 
 """
 from __future__ import annotations
 
+import os
 import queue
 import sys
 import threading
@@ -22,6 +23,7 @@ from . import cli
 TAUX = 16_000
 TRAME = 480  # 30 ms
 EN_COURS = cli.AUDIO / "_en_cours"
+PID = cli.DOSSIER / ".consultation.pid"  # lu par bin/ecoute-bouton (marche/arrêt)
 
 
 class Segmenteur:
@@ -72,9 +74,14 @@ def source_micro(file_trames: queue.Queue, arret: threading.Event, appareil=None
             print(f"  (micro : {statut})", file=sys.stderr)
         file_trames.put(indata[:, 0].copy())
 
-    with sd.InputStream(samplerate=TAUX, channels=1, dtype="float32", blocksize=TRAME,
-                        callback=rappel, device=appareil):
-        arret.wait()
+    try:
+        with sd.InputStream(samplerate=TAUX, channels=1, dtype="float32", blocksize=TRAME,
+                            callback=rappel, device=appareil):
+            arret.wait()
+    except Exception as e:  # noqa: BLE001 — pas de micro, accès refusé…
+        print(f"\n❌ Micro inaccessible ({e}).\n   Branchez un micro ou autorisez le Terminal dans "
+              "Réglages système › Confidentialité et sécurité › Micro.", file=sys.stderr, flush=True)
+        arret.set()
 
 
 def source_fichier(chemin: Path, file_trames: queue.Queue, arret: threading.Event,
@@ -98,9 +105,17 @@ def source_fichier(chemin: Path, file_trames: queue.Queue, arret: threading.Even
 
 def consultation(type_note: str = "cr", appareil=None, fichier: Path | None = None,
                  vitesse: float = 1.0, passe_finale: bool = True,
-                 modele_final: str | None = None) -> Path:
+                 modele_final: str | None = None) -> Path | None:
     cli.initialiser()
     EN_COURS.mkdir(parents=True, exist_ok=True)
+    PID.write_text(str(os.getpid()))
+    try:
+        return _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final)
+    finally:
+        PID.unlink(missing_ok=True)
+
+
+def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final) -> Path | None:
     debut = datetime.now()
     wav_chemin = cli.chemin_libre(EN_COURS, f"{debut:%Y-%m-%d_%Hh%M}_{type_note}", ".wav")
     wav = wave.open(str(wav_chemin), "wb")
@@ -167,4 +182,7 @@ def consultation(type_note: str = "cr", appareil=None, fichier: Path | None = No
             return cli.traiter_audio(wav_chemin, type_note, modele_final)
         except Exception as e:  # noqa: BLE001 — on garde au moins le texte du direct
             cli.log(f"Passe finale impossible ({e}) : on garde la transcription du direct.")
+    if duree < 1 and not textes:  # rien enregistré (micro absent…) : pas de note vide
+        wav_chemin.unlink(missing_ok=True)
+        return None
     return cli.creer_note("\n".join(textes), type_note, wav_chemin)

@@ -61,4 +61,37 @@ EOF
 launchctl bootout "gui/$(id -u)/com.thomaslefevre.ecoute" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
-echo "✅ Installé et surveillance active en arrière-plan. En consultation, lancez : ecoute consultation"
+# Boutons marche/arrêt (apps dans Applications + Dock) : 1 clic = écoute, 2e clic = fin
+chmod +x bin/ecoute-bouton
+APPS=/Applications; [[ -w $APPS ]] || { APPS="$HOME/Applications"; mkdir -p "$APPS"; }
+for v in "cr:Écoute Consultation" "rcp:Écoute RCP"; do
+  t="${v%%:*}"; nom="${v#*:}"; app="$APPS/$nom.app"
+  rm -rf "$app"
+  osacompile -o "$app" -e "do shell script quoted form of \"$PWD/bin/ecoute-bouton\" & \" $t\""
+  ic=$(mktemp -d)
+  if qlmanage -t -s 512 -o "$ic" "assets/bouton-$t.svg" >/dev/null 2>&1; then
+    mkdir "$ic/i.iconset"
+    for s in 16 32 128 256 512; do
+      sips -z $s $s "$ic/bouton-$t.svg.png" --out "$ic/i.iconset/icon_${s}x${s}.png" >/dev/null
+      sips -z $((s*2)) $((s*2)) "$ic/bouton-$t.svg.png" --out "$ic/i.iconset/icon_${s}x${s}@2x.png" >/dev/null
+    done
+    iconutil -c icns "$ic/i.iconset" -o "$app/Contents/Resources/applet.icns"
+    # macOS privilégie Assets.car (icône générique) : on le retire pour garder notre icône
+    rm -f "$app/Contents/Resources/Assets.car"
+    plutil -remove CFBundleIconName "$app/Contents/Info.plist" 2>/dev/null || true
+    codesign --force --sign - "$app" 2>/dev/null || true
+    touch "$app"
+  fi
+  rm -rf "$ic"
+  if ! defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "coute ${nom#* }\";"; then
+    defaults write com.apple.dock persistent-apps -array-add \
+      "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>$app</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
+  fi
+done
+LS=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+$LS -f "$APPS/Écoute Consultation.app" "$APPS/Écoute RCP.app" 2>/dev/null || true
+rm -f "$(getconf DARWIN_USER_CACHE_DIR)com.apple.dock.iconcache"
+killall Dock 2>/dev/null || true
+
+echo "✅ Installé et surveillance active en arrière-plan."
+echo "   En consultation : cliquez sur « Écoute Consultation » dans le Dock (recliquez pour terminer)."

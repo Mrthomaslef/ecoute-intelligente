@@ -327,7 +327,8 @@ def main() -> None:
             a.type, micro, a.fichier, a.vitesse, passe_finale=not a.rapide,
             modele_final="mlx-community/whisper-large-v3-mlx" if a.precis else None,
         )
-        subprocess.run(["open", "-t", str(note)], check=False)
+        if note:
+            subprocess.run(["open", "-t", str(note)], check=False)
     elif a.cmd == "micros":
         import sounddevice as sd
         print(sd.query_devices())

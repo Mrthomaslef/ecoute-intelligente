@@ -7,3 +7,4 @@ __pycache__/
 *.wav
 *.caf
 noms_a_masquer.txt
+.lanceur-*.command

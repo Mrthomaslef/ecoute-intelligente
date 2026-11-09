@@ -18,6 +18,10 @@ Le script installe ffmpeg, Whisper (MLX), précharge une fois le modèle `large-
 
 ## En consultation : écoute en direct
 
+**Un bouton dans le Dock** : cliquez sur 🟣 **Écoute Consultation** (ou 🟢 **Écoute RCP**) pour démarrer l'écoute. Une fenêtre Terminal affiche le texte en direct. **Recliquez sur le même bouton pour terminer** : la transcription finale se lance et la note s'ouvre. Les deux apps se trouvent aussi dans `Applications` et Spotlight.
+
+En ligne de commande :
+
 ```bash
 ecoute consultation            # CR de consultation (Ctrl+C pour terminer)
 ecoute consultation --type rcp # RCP

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="#9333ea"/>
+  <rect x="196" y="80" width="120" height="200" rx="60" fill="#fff"/>
+  <path d="M146 230a110 110 0 0 0 220 0" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round"/>
+  <line x1="256" y1="340" x2="256" y2="380" stroke="#fff" stroke-width="28" stroke-linecap="round"/>
+  <text x="256" y="446" text-anchor="middle" font-family="-apple-system, Helvetica, sans-serif" font-size="58" font-weight="700" fill="#fff">CONSULT</text>
+</svg>
