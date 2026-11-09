@@ -8,3 +8,4 @@ __pycache__/
 *.caf
 noms_a_masquer.txt
 .lanceur-*.command
+.demarrage

@@ -8,9 +8,17 @@ notifier() { osascript -e "display notification \"$1\" with title \"Écoute inte
 
 PID=$(cat "$PIDF" 2>/dev/null)
 if [[ -n "$PID" ]] && kill -0 "$PID" 2>/dev/null; then
+  # Anti double-clic : on ignore un arrêt demandé moins de 10 s après le démarrage
+  if (( $(date +%s) - $(stat -f %m "$PIDF") < 10 )); then
+    notifier "Démarrage en cours… Recliquez plus tard pour terminer."
+    exit 0
+  fi
   kill -INT "$PID"
   notifier "Fin de l'écoute : transcription finale en cours, la note va s'ouvrir."
+elif [[ -e "$DIR/.demarrage" ]] && (( $(date +%s) - $(stat -f %m "$DIR/.demarrage") < 10 )); then
+  notifier "Démarrage en cours…"   # 2e clic avant que l'écoute ait démarré
 else
+  touch "$DIR/.demarrage"
   LANCEUR="$DIR/.lanceur-$TYPE.command"
   print -r -- "#!/bin/zsh
 clear
