@@ -50,6 +50,8 @@ CORRECTIONS_DEFAUT = {
     "xarelo": "Xarelto", "zarelto": "Xarelto", "éliquis": "Eliquis", "élicuis": "Eliquis",
     "prévisant": "Préviscan", "lovenoxe": "Lovenox", "nidouce": "nidus",
     "flébite": "phlébite", "cimentoplastique": "cimentoplastie", "stire": "STIR",
+    "évrum": "névrome", "névrum": "névrome", "interméthatarsien": "intermétatarsien",
+    "sous-scannée": "sous scanner", "sous-scanner": "sous scanner",
 }
 
 
@@ -188,9 +190,10 @@ def traiter_audio(audio: Path, type_note: str | None = None, modele: str | None 
     return creer_note(transcrire_audio(audio, modele), type_note, audio)
 
 
-def creer_note(brut: str, type_note: str, audio: Path | None = None) -> Path:
+def creer_note(brut: str, type_note: str, audio: Path | None = None,
+               noms_extra: list[str] | None = None) -> Path:
     """Anonymise une transcription et la dépose dans 2_A_Relire (audio rangé dans _traites)."""
-    res = anonymiser(brut, charger_liste_noms(LISTE_NOMS))
+    res = anonymiser(brut, charger_liste_noms(LISTE_NOMS) + list(noms_extra or []))
     # Nom de fichier horodaté : le nom de l'audio peut contenir un nom de patient.
     base = f"{datetime.now():%Y-%m-%d_%Hh%M}_{type_note}"
     note = chemin_libre(A_RELIRE, base, ".md")
@@ -215,16 +218,16 @@ def creer_note(brut: str, type_note: str, audio: Path | None = None) -> Path:
 
 
 # --------------------------------------------------------------- rédaction
-def rediger(note: Path) -> Path:
+def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None = None) -> Path:
     entete, corps = lire_note(note)
     type_note = entete.get("type", "cr").lower()
     if type_note not in {"cr", "rcp"}:
         type_note = "cr"
     # Seconde passe d'anonymisation (filet de sécurité après relecture).
-    res = anonymiser(corps, charger_liste_noms(LISTE_NOMS))
+    res = anonymiser(corps, charger_liste_noms(LISTE_NOMS) + list(noms_extra or []))
     if res.remplacements:
         log(f"Seconde passe : {dict(res.remplacements)} masqué(s) en plus.")
-    consigne = (RACINE_PROJET / "prompts" / f"{type_note}.md").read_text(encoding="utf-8")
+    consigne = (RACINE_PROJET / "prompts" / f"{trame or type_note}.md").read_text(encoding="utf-8")
     entree = f"{consigne}\n\n---\nTRANSCRIPTION ANONYMISÉE :\n\n{res.texte}\n"
     log(f"Rédaction par Claude ({MODELE_CLAUDE})…")
     cmd = [
@@ -238,9 +241,47 @@ def rediger(note: Path) -> Path:
         raise RuntimeError(f"Échec de Claude : {proc.stderr.strip() or proc.stdout.strip()}")
     sortie = chemin_libre(PRETS, f"{note.stem}_redige", ".md")
     ecrire_note(sortie, {"type": type_note, "source": note.name, "modele": MODELE_CLAUDE}, proc.stdout)
-    if note.parent.resolve() == VALIDE.resolve():
+    if note.parent.resolve() in {VALIDE.resolve(), A_RELIRE.resolve()}:
         shutil.move(str(note), chemin_libre(ENVOYES, note.stem, ".md"))
     log(f"→ {sortie}")
+    return sortie
+
+
+# ------------------------------------------------- consultation → agenda
+def notifier(message: str) -> None:
+    message = message.replace('"', "'")
+    subprocess.run(["osascript", "-e", f'display notification "{message}" with title "Écoute intelligente"'],
+                   capture_output=True)
+
+
+def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime) -> Path:
+    """Tout automatique : anonymisation → Claude → CR déposé dans la fiche patient de l'agenda."""
+    from . import agenda
+
+    consultations, patient = [], None
+    try:
+        consultations = agenda.consultations_du(debut)
+        patient = agenda.choisir(consultations, debut, brut)
+    except Exception as e:  # noqa: BLE001 — l'agenda est un bonus : le CR est produit quand même
+        log(f"Agenda inaccessible ({e}).")
+    # Les noms des patients du jour sont masqués avant tout envoi à Claude.
+    noms = sorted({m for c in consultations for m in agenda.mots_du_nom(c.patient)}, key=len, reverse=True)
+    note = creer_note(brut, "cr", audio, noms)
+    sortie = rediger(note, noms, trame="consultation")
+    _, cr = lire_note(sortie)
+    if not patient:
+        notifier("Patient non trouvé dans l'agenda : CR prêt dans 4_CR_Prets.")
+        subprocess.run(["open", "-t", str(sortie)], check=False)
+        return sortie
+    try:
+        agenda.deposer(patient, agenda.reidentifier(cr, patient))
+    except Exception as e:  # noqa: BLE001
+        log(f"Dépôt dans l'agenda impossible ({e}).")
+        notifier("Dépôt dans l'agenda impossible : CR prêt dans 4_CR_Prets.")
+        subprocess.run(["open", "-t", str(sortie)], check=False)
+        return sortie
+    log(f"→ CR déposé dans l'agenda : consultation de {patient.horaire or '?'} ({patient.date}).")
+    notifier(f"CR déposé dans l'agenda : {patient.patient} ({patient.horaire}).")
     return sortie
 
 
@@ -305,9 +346,12 @@ def main() -> None:
                    help="sans passe finale : garde directement le texte du direct")
     c.add_argument("--precis", action="store_true",
                    help="passe finale avec large-v3 complet (plus lent, plus juste)")
+    c.add_argument("--sans-agenda", action="store_true",
+                   help="ne pas déposer le CR dans l'Agenda RI (note à relire à la place)")
     c.add_argument("--fichier", type=Path, help=argparse.SUPPRESS)
     c.add_argument("--vitesse", type=float, default=1.0, help=argparse.SUPPRESS)
     sp.add_parser("micros", help="liste les micros disponibles")
+    sp.add_parser("agenda", help="vérifie l'accès à l'Agenda RI et liste les consultations du jour")
     a = p.parse_args()
 
     initialiser()
@@ -326,9 +370,16 @@ def main() -> None:
         note = consultation(
             a.type, micro, a.fichier, a.vitesse, passe_finale=not a.rapide,
             modele_final="mlx-community/whisper-large-v3-mlx" if a.precis else None,
+            agenda_auto=not a.sans_agenda,
         )
-        if note:
+        if note and a.type == "rcp":
             subprocess.run(["open", "-t", str(note)], check=False)
+    elif a.cmd == "agenda":
+        from . import agenda
+        for c in agenda.consultations_du(datetime.now()):
+            initiales = "".join(m[0].upper() for m in agenda.mots_du_nom(c.patient))
+            print(f"{c.horaire or '?':>8}  {initiales:<5} {c.medecin[:30]:<30} {c.titre[:60]}")
+        print("✅ Agenda accessible.")
     elif a.cmd == "micros":
         import sounddevice as sd
         print(sd.query_devices())

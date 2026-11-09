@@ -5,7 +5,7 @@
 Enregistrement de consultation ou de RCP → **transcription 100 % locale** (Whisper sur puce Apple) → **anonymisation locale** → **relecture humaine obligatoire** → rédaction du CR, des actions et des brouillons de mails par Claude.
 
 > [!WARNING]
-> Rien ne part vers Claude tant que **vous** n'avez pas relu la note et ne l'avez pas déplacée dans `3_Valide`. L'anonymisation automatique masque les noms précédés d'une civilité, les dates complètes, les IPP/NIP/INS (même dictés en lettres), les téléphones et les e-mails, mais **elle n'est pas infaillible** : un nom prononcé seul (« le dossier Lebrun ») est seulement *signalé*, pas masqué.
+> Mode consultation : envoi **automatique** à Claude après anonymisation locale, sans relecture (choix assumé). Pour les autres circuits, rien ne part vers Claude tant que **vous** n'avez pas relu la note et ne l'avez pas déplacée dans `3_Valide`. L'anonymisation automatique masque les noms précédés d'une civilité, les dates complètes, les IPP/NIP/INS (même dictés en lettres), les téléphones et les e-mails, mais **elle n'est pas infaillible** : un nom prononcé seul (« le dossier Lebrun ») est seulement *signalé*, pas masqué.
 
 ## Installation (MacBook Air ou Mac mini, Apple Silicon)
 
@@ -18,7 +18,14 @@ Le script installe ffmpeg, Whisper (MLX), précharge une fois le modèle `large-
 
 ## En consultation : écoute en direct
 
-**Un bouton dans le Dock** : cliquez sur 🟣 **Écoute Consultation** (ou 🟢 **Écoute RCP**) pour démarrer l'écoute. Une fenêtre Terminal affiche le texte en direct. **Recliquez sur le même bouton pour terminer** : la transcription finale se lance et la note s'ouvre. Les deux apps se trouvent aussi dans `Applications` et Spotlight.
+**Un bouton dans le Dock** : cliquez sur 🟣 **Écoute Consultation** pour démarrer l'écoute, parlez, puis **recliquez pour terminer**. Tout le reste est automatique :
+
+1. transcription finale locale de tout l'enregistrement ;
+2. identification du patient dans l'**Agenda RI Cochin** (onglet Consultations du jour) : nom entendu pendant la consultation, sinon votre créneau horaire le plus proche (± 2 h) ;
+3. anonymisation locale (y compris les noms de tous les patients du jour) puis rédaction du CR de consultation par Claude ;
+4. réinsertion locale de l'identité et **dépôt du CR dans la fiche du patient** (« Remarques de suivi » / « Suivi clinique & recommandations CS »), à la suite de ce qui y figurait déjà. Une notification confirme le patient.
+
+Si le patient n'est pas trouvé ou si l'agenda est inaccessible, le CR s'ouvre et reste dans `4_CR_Prets`. 🟢 **Écoute RCP** garde l'ancien circuit (note à relire puis `3_Valide`). Le code d'accès de l'agenda est demandé une seule fois par Mac (Trousseau) ; `ecoute agenda` vérifie l'accès.
 
 En ligne de commande :
 

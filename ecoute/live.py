@@ -105,17 +105,19 @@ def source_fichier(chemin: Path, file_trames: queue.Queue, arret: threading.Even
 
 def consultation(type_note: str = "cr", appareil=None, fichier: Path | None = None,
                  vitesse: float = 1.0, passe_finale: bool = True,
-                 modele_final: str | None = None) -> Path | None:
+                 modele_final: str | None = None, agenda_auto: bool = True) -> Path | None:
     cli.initialiser()
     EN_COURS.mkdir(parents=True, exist_ok=True)
     PID.write_text(str(os.getpid()))
     try:
-        return _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final)
+        return _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final,
+                             agenda_auto)
     finally:
         PID.unlink(missing_ok=True)
 
 
-def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final) -> Path | None:
+def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final,
+                  agenda_auto) -> Path | None:
     debut = datetime.now()
     wav_chemin = cli.chemin_libre(EN_COURS, f"{debut:%Y-%m-%d_%Hh%M}_{type_note}", ".wav")
     wav = wave.open(str(wav_chemin), "wb")
@@ -176,13 +178,16 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
     duree = echantillons / TAUX
     cli.log(f"Enregistrement : {int(duree // 60)} min {int(duree % 60)} s")
 
-    if passe_finale and duree > 2:
-        cli.log("Passe finale sur l'enregistrement complet (plus précise)…")
-        try:
-            return cli.traiter_audio(wav_chemin, type_note, modele_final)
-        except Exception as e:  # noqa: BLE001 — on garde au moins le texte du direct
-            cli.log(f"Passe finale impossible ({e}) : on garde la transcription du direct.")
     if duree < 1 and not textes:  # rien enregistré (micro absent…) : pas de note vide
         wav_chemin.unlink(missing_ok=True)
         return None
-    return cli.creer_note("\n".join(textes), type_note, wav_chemin)
+    brut = "\n".join(textes)
+    if passe_finale and duree > 2:
+        cli.log("Passe finale sur l'enregistrement complet (plus précise)…")
+        try:
+            brut = cli.transcrire_audio(wav_chemin, modele_final)
+        except Exception as e:  # noqa: BLE001 — on garde au moins le texte du direct
+            cli.log(f"Passe finale impossible ({e}) : on garde la transcription du direct.")
+    if type_note == "cr" and agenda_auto:
+        return cli.consultation_vers_agenda(brut, wav_chemin, debut)
+    return cli.creer_note(brut, type_note, wav_chemin)

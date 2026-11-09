@@ -103,5 +103,8 @@ $LS -f "$APPS/Écoute Consultation.app" "$APPS/Écoute RCP.app" 2>/dev/null || t
 rm -f "$(getconf DARWIN_USER_CACHE_DIR)com.apple.dock.iconcache"
 killall Dock 2>/dev/null || true
 
+# Accès à l'Agenda RI Cochin (le code d'accès est demandé une seule fois, puis gardé dans le Trousseau)
+bin/ecoute agenda >/dev/null 2>&1 && echo "✅ Agenda RI accessible." || echo "⚠️  Agenda RI non accessible : lancez « ecoute agenda » pour saisir le code."
+
 echo "✅ Installé et surveillance active en arrière-plan."
 echo "   En consultation : cliquez sur « Écoute Consultation » dans le Dock (recliquez pour terminer)."
