@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+# Jamais de données patient dans le dépôt
+*.m4a
+*.mp3
+*.wav
+*.caf
+noms_a_masquer.txt

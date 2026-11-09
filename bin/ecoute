@@ -1,0 +1,3 @@
+#!/bin/zsh
+DIR="${0:A:h:h}"
+PYTHONPATH="$DIR" exec "$DIR/.venv/bin/python" -m ecoute.cli "$@"
