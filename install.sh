@@ -6,11 +6,21 @@ cd "$(dirname "$0")"
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 [[ "$(uname -m)" == "arm64" ]] || { echo "Mac Apple Silicon (M1 ou plus récent) requis."; exit 1; }
-command -v brew >/dev/null || { echo "Installez Homebrew : https://brew.sh"; exit 1; }
-command -v ffmpeg >/dev/null || brew install ffmpeg
-command -v uv >/dev/null || brew install uv
+# Homebrew facultatif : sans lui, tout s'installe dans le dossier utilisateur (pas de sudo)
+if ! command -v uv >/dev/null; then
+  if command -v brew >/dev/null; then brew install uv
+  else curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh; fi
+fi
 [[ -d .venv ]] || uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python mlx-whisper sounddevice numpy
+mkdir -p "$HOME/.local/bin"
+if ! command -v ffmpeg >/dev/null; then
+  if command -v brew >/dev/null; then brew install ffmpeg
+  else  # binaire ffmpeg autonome fourni par le paquet Python imageio-ffmpeg
+    uv pip install --python .venv/bin/python imageio-ffmpeg
+    ln -sf "$(.venv/bin/python -c 'import imageio_ffmpeg as i; print(i.get_ffmpeg_exe())')" "$HOME/.local/bin/ffmpeg"
+  fi
+fi
 
 chmod +x bin/ecoute
 mkdir -p "$HOME/.local/bin" && ln -sf "$PWD/bin/ecoute" "$HOME/.local/bin/ecoute"
