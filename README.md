@@ -14,7 +14,7 @@ git clone https://github.com/mrthomaslef/ecoute-intelligente.git ~/ecoute-intell
 cd ~/ecoute-intelligente && ./install.sh
 ```
 
-Le script installe ffmpeg, Whisper (MLX) et télécharge une fois le modèle `large-v3-turbo` (≈1,6 Go). Ensuite, tout fonctionne hors ligne, sauf l'étape Claude.
+Le script installe ffmpeg, Whisper (MLX), précharge une fois le modèle `large-v3-turbo` (≈1,6 Go) et active en arrière-plan la surveillance automatique des dossiers `~/EcouteIntelligente`. Ensuite, tout fonctionne hors ligne, sauf l'étape Claude.
 
 ## En consultation : écoute en direct
 
@@ -27,7 +27,7 @@ ecoute micros                  # choisir un micro externe : --micro <numéro>
 
 1. **Pendant** l'échange, chaque phrase s'affiche environ 1 seconde après avoir été prononcée. L'audio est sauvegardé en continu sur le Mac.
 2. **À la fin** (Ctrl+C), tout l'enregistrement est retranscrit une seconde fois en une seule passe, avec le contexte complet, ce qui est plus juste que le direct. La note anonymisée s'ouvre ensuite pour relecture.
-3. Une fois la note relue, déplacez-la dans `3_Valide` : Claude rédige alors le CR, les points de vigilance et le courrier au confrère.
+3. Une fois la note relue, déplacez-la dans `3_Valide` : la surveillance en arrière-plan détecte le fichier et Claude rédige automatiquement le CR, les points de vigilance et le courrier au confrère dans `4_CR_Prets`.
 
 > [!TIP]
 > Pour une transcription la plus juste possible :
@@ -39,8 +39,8 @@ ecoute micros                  # choisir un micro externe : --micro <numéro>
 ## Fichiers déposés (dictaphone, iPhone)
 
 ```bash
-ecoute surveiller        # laisser tourner dans un terminal
 ecoute dossiers          # ouvrir les dossiers dans le Finder
+ecoute surveiller        # (déjà lancé automatiquement en arrière-plan par install.sh)
 ```
 
 | Dossier (`~/EcouteIntelligente`) | Rôle |
