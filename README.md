@@ -16,7 +16,27 @@ cd ~/ecoute-intelligente && ./install.sh
 
 Le script installe ffmpeg, Whisper (MLX) et télécharge une fois le modèle `large-v3-turbo` (≈1,6 Go). Ensuite, tout fonctionne hors ligne, sauf l'étape Claude.
 
-## Utilisation
+## En consultation : écoute en direct
+
+```bash
+ecoute consultation            # CR de consultation (Ctrl+C pour terminer)
+ecoute consultation --type rcp # RCP
+ecoute consultation --precis   # passe finale avec large-v3 complet (plus lent, plus juste)
+ecoute micros                  # choisir un micro externe : --micro <numéro>
+```
+
+1. **Pendant** l'échange, chaque phrase s'affiche environ 1 seconde après avoir été prononcée. L'audio est sauvegardé en continu sur le Mac.
+2. **À la fin** (Ctrl+C), tout l'enregistrement est retranscrit une seconde fois en une seule passe, avec le contexte complet, ce qui est plus juste que le direct. La note anonymisée s'ouvre ensuite pour relecture.
+3. Une fois la note relue, déplacez-la dans `3_Valide` : Claude rédige alors le CR, les points de vigilance et le courrier au confrère.
+
+> [!TIP]
+> Pour une transcription la plus juste possible :
+> - Posez le MacBook entre vous et le patient, ou utilisez un petit micro-cravate ou un micro de table.
+> - Ajoutez vos termes dans `vocabulaire.txt` (molécules, techniques, noms de correspondants).
+> - Notez dans `corrections.txt` les erreurs récurrentes, par exemple `cardégique = Kardégic`.
+> - Au premier lancement, macOS demande l'accès au micro pour le Terminal : cliquez sur **Autoriser**.
+
+## Fichiers déposés (dictaphone, iPhone)
 
 ```bash
 ecoute surveiller        # laisser tourner dans un terminal
@@ -30,6 +50,7 @@ ecoute dossiers          # ouvrir les dossiers dans le Finder
 | `3_Valide` | Déplacer ici la note relue : elle part automatiquement chez Claude |
 | `4_CR_Prets` | CR, liste d'actions et brouillons de mails |
 | `noms_a_masquer.txt` | Noms à toujours masquer (reste sur le Mac) |
+| `vocabulaire.txt`, `corrections.txt` | Vocabulaire et corrections personnelles de transcription |
 
 Commandes ponctuelles : `ecoute transcrire fichier.m4a --type rcp` et `ecoute rediger note.md`.
 

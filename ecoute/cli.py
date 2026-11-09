@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,8 @@ AUDIO, A_RELIRE, VALIDE, PRETS = (
 TRAITES = AUDIO / "_traites"
 ENVOYES = VALIDE / "_envoyes"
 LISTE_NOMS = DOSSIER / "noms_a_masquer.txt"
+LISTE_VOCAB = DOSSIER / "vocabulaire.txt"
+LISTE_CORRECTIONS = DOSSIER / "corrections.txt"
 
 MODELE_WHISPER = os.environ.get("ECOUTE_WHISPER", "mlx-community/whisper-large-v3-turbo")
 MODELE_CLAUDE = os.environ.get("ECOUTE_MODELE", "sonnet")
@@ -37,13 +40,34 @@ VOCABULAIRE = (
     "Radiologie ostéo-articulaire et interventionnelle, Hôpital Cochin. RCP sarcomes. "
     "IRM, scanner, TEP, biopsie, cryoablation, radiofréquence, cimentoplastie, vissage "
     "percutané, électrochimiothérapie, sclérothérapie, ostéome ostéoïde, chondrosarcome, "
-    "tumeur à cellules géantes, kyste anévrismal, métastase, anticoagulants, Xarelto, Eliquis."
+    "tumeur à cellules géantes, kyste anévrismal, métastase, nidus, tassement vertébral, "
+    "hypersignal STIR, hyposignal T1, anticoagulants, Kardégic, Xarelto, Eliquis, Plavix, "
+    "Préviscan, Lovenox."
 )
+# Erreurs fréquentes de Whisper sur le vocabulaire médical (complétables via corrections.txt).
+CORRECTIONS_DEFAUT = {
+    "cardégique": "Kardégic", "cardégic": "Kardégic", "kardégique": "Kardégic",
+    "xarelo": "Xarelto", "zarelto": "Xarelto", "éliquis": "Eliquis", "élicuis": "Eliquis",
+    "prévisant": "Préviscan", "lovenoxe": "Lovenox", "nidouce": "nidus",
+    "flébite": "phlébite", "cimentoplastique": "cimentoplastie", "stire": "STIR",
+}
 
 
 def initialiser() -> None:
     for d in (AUDIO / "CR", AUDIO / "RCP", TRAITES, A_RELIRE, VALIDE, ENVOYES, PRETS):
         d.mkdir(parents=True, exist_ok=True)
+    if not LISTE_VOCAB.exists():
+        LISTE_VOCAB.write_text(
+            "# Termes que Whisper doit bien orthographier (un par ligne) :\n"
+            "# noms de molécules, de techniques, de correspondants…\n",
+            encoding="utf-8",
+        )
+    if not LISTE_CORRECTIONS.exists():
+        LISTE_CORRECTIONS.write_text(
+            "# Corrections automatiques après transcription, une par ligne :\n"
+            "# mot mal transcrit = bonne orthographe   (ex. : cardégique = Kardégic)\n",
+            encoding="utf-8",
+        )
     if not LISTE_NOMS.exists():
         LISTE_NOMS.write_text(
             "# Un nom par ligne : noms de patients, proches ou lieux à toujours masquer.\n"
@@ -86,21 +110,71 @@ def chemin_libre(dossier: Path, base: str, ext: str) -> Path:
 
 
 # ---------------------------------------------------------- transcription
-def transcrire_audio(audio: Path) -> str:
+HALLUCINATIONS = (
+    "sous-titres réalisés par", "sous-titrage", "amara.org", "merci d'avoir regardé",
+    "abonnez-vous", "radio-canada", "société radio",
+)
+
+
+def consigne_vocabulaire() -> str:
+    """Vocabulaire de base + termes personnels (vocabulaire.txt), tronqué pour Whisper."""
+    perso = ""
+    if LISTE_VOCAB.exists():
+        termes = [l.strip() for l in LISTE_VOCAB.read_text(encoding="utf-8").splitlines()
+                  if l.strip() and not l.startswith("#")]
+        perso = " " + ", ".join(termes)
+    return (VOCABULAIRE + perso)[:800]
+
+
+def charger_corrections() -> dict[str, str]:
+    corr = dict(CORRECTIONS_DEFAUT)
+    if LISTE_CORRECTIONS.exists():
+        for ligne in LISTE_CORRECTIONS.read_text(encoding="utf-8").splitlines():
+            if "=" in ligne and not ligne.lstrip().startswith("#"):
+                faux, vrai = ligne.split("=", 1)
+                if faux.strip() and vrai.strip():
+                    corr[faux.strip().lower()] = vrai.strip()
+    return corr
+
+
+def corriger(texte: str, corrections: dict[str, str] | None = None) -> str:
+    for faux, vrai in (corrections or charger_corrections()).items():
+        texte = re.sub(rf"(?<!\w){re.escape(faux)}(?!\w)", vrai, texte, flags=re.IGNORECASE)
+    return texte
+
+
+def segment_valide(seg: dict) -> bool:
+    texte = seg.get("text", "").strip()
+    if not texte:
+        return False
+    if any(h in texte.lower() for h in HALLUCINATIONS):
+        return False
+    # Silence probable transcrit à tort.
+    return not (seg.get("no_speech_prob", 0) > 0.6 and seg.get("avg_logprob", 0) < -1.0)
+
+
+def transcrire(source, modele: str | None = None, contexte: str = "") -> str:
+    """Transcrit un fichier (chemin) ou un tableau numpy 16 kHz, en français."""
     try:
         import mlx_whisper
     except ImportError:
         sys.exit("mlx-whisper absent : lancez ./install.sh")
-    log(f"Transcription locale ({MODELE_WHISPER.split('/')[-1]})…")
     res = mlx_whisper.transcribe(
-        str(audio),
-        path_or_hf_repo=MODELE_WHISPER,
+        source if not isinstance(source, Path) else str(source),
+        path_or_hf_repo=modele or MODELE_WHISPER,
         language="fr",
-        initial_prompt=VOCABULAIRE,
+        initial_prompt=(consigne_vocabulaire() + " " + contexte[-300:]).strip(),
         condition_on_previous_text=False,
+        temperature=(0.0, 0.2, 0.4),
+        verbose=None,
     )
-    segments = [s["text"].strip() for s in res.get("segments", []) if s["text"].strip()]
-    return "\n".join(segments) if segments else res.get("text", "").strip()
+    texte = "\n".join(s["text"].strip() for s in res.get("segments", []) if segment_valide(s))
+    return corriger(texte)
+
+
+def transcrire_audio(audio: Path, modele: str | None = None) -> str:
+    log(f"Transcription locale ({(modele or MODELE_WHISPER).split('/')[-1]})…")
+    return transcrire(audio, modele)
 
 
 def deviner_type(audio: Path) -> str:
@@ -109,9 +183,13 @@ def deviner_type(audio: Path) -> str:
     return "rcp" if "rcp" in audio.stem.lower() else "cr"
 
 
-def traiter_audio(audio: Path, type_note: str | None = None) -> Path:
+def traiter_audio(audio: Path, type_note: str | None = None, modele: str | None = None) -> Path:
     type_note = type_note or deviner_type(audio)
-    brut = transcrire_audio(audio)
+    return creer_note(transcrire_audio(audio, modele), type_note, audio)
+
+
+def creer_note(brut: str, type_note: str, audio: Path | None = None) -> Path:
+    """Anonymise une transcription et la dépose dans 2_A_Relire (audio rangé dans _traites)."""
     res = anonymiser(brut, charger_liste_noms(LISTE_NOMS))
     # Nom de fichier horodaté : le nom de l'audio peut contenir un nom de patient.
     base = f"{datetime.now():%Y-%m-%d_%Hh%M}_{type_note}"
@@ -130,7 +208,8 @@ def traiter_audio(audio: Path, type_note: str | None = None) -> Path:
         "statut": "a_relire",
     }
     ecrire_note(note, entete, "\n".join(consignes) + "\n\n" + res.texte)
-    shutil.move(str(audio), chemin_libre(TRAITES, base, audio.suffix.lower()))
+    if audio and audio.exists():
+        shutil.move(str(audio), chemin_libre(TRAITES, base, audio.suffix.lower()))
     log(f"→ {note.name} (remplacements : {remplacements}; à vérifier : {len(res.a_verifier)})")
     return note
 
@@ -219,6 +298,16 @@ def main() -> None:
     r = sp.add_parser("rediger", help="envoie une note relue à Claude")
     r.add_argument("note", type=Path)
     sp.add_parser("dossiers", help="crée les dossiers et les ouvre dans le Finder")
+    c = sp.add_parser("consultation", help="écoute en direct pendant la consultation")
+    c.add_argument("--type", choices=["cr", "rcp"], default="cr")
+    c.add_argument("--micro", help="numéro ou nom du micro (voir : ecoute micros)")
+    c.add_argument("--rapide", action="store_true",
+                   help="sans passe finale : garde directement le texte du direct")
+    c.add_argument("--precis", action="store_true",
+                   help="passe finale avec large-v3 complet (plus lent, plus juste)")
+    c.add_argument("--fichier", type=Path, help=argparse.SUPPRESS)
+    c.add_argument("--vitesse", type=float, default=1.0, help=argparse.SUPPRESS)
+    sp.add_parser("micros", help="liste les micros disponibles")
     a = p.parse_args()
 
     initialiser()
@@ -231,6 +320,17 @@ def main() -> None:
         traiter_audio(a.audio.expanduser().resolve(), a.type)
     elif a.cmd == "rediger":
         rediger(a.note.expanduser().resolve())
+    elif a.cmd == "consultation":
+        from .live import consultation
+        micro = int(a.micro) if a.micro and a.micro.isdigit() else a.micro
+        note = consultation(
+            a.type, micro, a.fichier, a.vitesse, passe_finale=not a.rapide,
+            modele_final="mlx-community/whisper-large-v3-mlx" if a.precis else None,
+        )
+        subprocess.run(["open", "-t", str(note)], check=False)
+    elif a.cmd == "micros":
+        import sounddevice as sd
+        print(sd.query_devices())
     elif a.cmd == "dossiers":
         print(DOSSIER)
         subprocess.run(["open", str(DOSSIER)], check=False)

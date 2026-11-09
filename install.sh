@@ -7,7 +7,7 @@ command -v brew >/dev/null || { echo "Installez Homebrew : https://brew.sh"; exi
 command -v ffmpeg >/dev/null || brew install ffmpeg
 command -v uv >/dev/null || brew install uv
 [[ -d .venv ]] || uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python mlx-whisper
+uv pip install --python .venv/bin/python mlx-whisper sounddevice numpy
 chmod +x bin/ecoute
 mkdir -p "$HOME/.local/bin" && ln -sf "$PWD/bin/ecoute" "$HOME/.local/bin/ecoute"
 bin/ecoute dossiers >/dev/null
