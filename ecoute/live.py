@@ -23,6 +23,8 @@ from . import cli
 TAUX = 16_000
 TRAME = 480  # 30 ms
 EN_COURS = cli.AUDIO / "_en_cours"
+SILENCE_MAX = 15 * 60  # arrêt automatique après 15 min sans parole transcrite (bouton oublié)
+DUREE_MAX = 2 * 3600   # et au plus tard après 2 h d'enregistrement
 PID = cli.DOSSIER / ".consultation.pid"  # lu par bin/ecoute-bouton (marche/arrêt)
 
 
@@ -127,6 +129,7 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
     file_segments: queue.Queue = queue.Queue()
     arret = threading.Event()
     textes: list[str] = []
+    dernier_texte = [time.monotonic()]
 
     def transcripteur():
         while (item := file_segments.get()) is not None:
@@ -134,6 +137,7 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
             texte = cli.transcrire(seg, contexte=" ".join(textes))
             if texte:
                 textes.append(texte)
+                dernier_texte[0] = time.monotonic()
                 m, s = divmod(int(t0), 60)
                 print(f"\033[2m[{m:02d}:{s:02d}]\033[0m {texte}", flush=True)
 
@@ -147,6 +151,7 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
         args=(fichier, file_trames, arret, vitesse) if fichier else (file_trames, arret, appareil),
         daemon=True,
     )
+    dernier_texte[0] = time.monotonic()  # le chargement du modèle ne compte pas
     capteur.start()
     print("\n\033[1m🎙  Écoute en cours — parlez normalement. Ctrl+C pour terminer.\033[0m\n",
           flush=True)
@@ -165,6 +170,10 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
                 if phrase is not None:
                     file_segments.put(((echantillons + i) / TAUX - len(phrase) / TAUX, phrase))
             echantillons += len(trame)
+            if time.monotonic() - dernier_texte[0] > SILENCE_MAX or echantillons > DUREE_MAX * TAUX:
+                cli.log("Arrêt automatique (silence prolongé ou durée maximale atteinte).")
+                cli.notifier("Écoute arrêtée automatiquement (bouton oublié ?).")
+                break
     except KeyboardInterrupt:
         print()
     arret.set()
@@ -178,7 +187,7 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
     duree = echantillons / TAUX
     cli.log(f"Enregistrement : {int(duree // 60)} min {int(duree % 60)} s")
 
-    if duree < 1 and not textes:  # rien enregistré (micro absent…) : pas de note vide
+    if not textes:  # aucune parole (micro absent, bouton oublié…) : pas de note vide
         wav_chemin.unlink(missing_ok=True)
         return None
     brut = "\n".join(textes)
