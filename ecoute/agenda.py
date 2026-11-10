@@ -20,8 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-WEBHOOK_DEFAUT = ("https://script.google.com/macros/s/AKfycbxLGqUevVWi36mNQ7WNoY2uhRsYLdsG_gQcscMPkP1GcQ"
-                  "Et0LgdhGIuzYL2SM-uTcPq/exec")
+WEBHOOK_DEFAUT = "https://script.google.com/macros/s/AKfycbxLGqUevVWi36mNQ7WNoY2uhRsYLdsG_gQcscMPkP1GcQEt0LgdhGIuzYL2SM-uTcPq/exec"
 ENV_AGENDA = Path.home() / "Documents" / "Agendainterventionnel" / ".env"
 TROUSSEAU = "ecoute-agenda-cochin"
 MEDECIN = "lefevre"
