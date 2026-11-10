@@ -99,9 +99,13 @@ def demander_code() -> str:
     return code
 
 
-def executer(code_js: str) -> object:
+class ApiSecurisee(Exception):
+    """Le script de l'agenda refuse le code dynamique : on passe par ses actions dédiées."""
+
+
+def poster(charge: dict) -> dict:
     url, jeton = _identifiants()
-    corps = json.dumps({"eval_code": code_js, "token": jeton}, ensure_ascii=False)
+    corps = json.dumps({**charge, "token": jeton}, ensure_ascii=False)
     r = subprocess.run(
         ["curl", "-4", "-sL", "--retry", "2", "--max-time", "90",
          "-H", "Content-Type: text/plain;charset=utf-8", "-d", "@-", url],
@@ -111,14 +115,44 @@ def executer(code_js: str) -> object:
     if rep.get("status") == "unauthorized":
         subprocess.run(["security", "delete-generic-password", "-s", TROUSSEAU], capture_output=True)
         raise RuntimeError("code d'accès de l'agenda refusé (il sera redemandé)")
+    return rep
+
+
+def executer(code_js: str) -> object:
+    rep = poster({"eval_code": code_js})
+    if rep.get("status") == "forbidden":
+        raise ApiSecurisee()
     if "evalResult" not in rep:
         raise RuntimeError(f"réponse inattendue de l'agenda : {str(rep)[:200]}")
     return rep["evalResult"]
 
 
 # ------------------------------------------------------------ lecture
+def lire_tout() -> dict:
+    """Action « read_all » du script sécurisé (mêmes données que l'app web)."""
+    rep = poster({"action": "read_all"})
+    donnees = rep.get("evalResult")
+    if rep.get("status") != "ok" or not isinstance(donnees, dict):
+        raise RuntimeError(f"lecture de l'agenda impossible : {str(rep)[:200]}")
+    return donnees
+
+
 def consultations_du(jour: datetime) -> list[Consultation]:
     date = f"{jour:%d/%m/%Y}"
+    try:
+        return _consultations_eval(date)
+    except ApiSecurisee:
+        return [
+            Consultation(int(r.get("_row", 0)), date, str(r.get("Horaire", "")).strip(),
+                         str(r.get("Identité Patient", "")).strip(),
+                         str(r.get("Médecin en charge", "")).strip(),
+                         str(r.get("Type d'acte / Consultation", "")).strip())
+            for r in lire_tout().get("Consultations", [])
+            if str(r.get("Date", "")).strip() == date and str(r.get("Identité Patient", "")).strip()
+        ]
+
+
+def _consultations_eval(date: str) -> list[Consultation]:
     lignes = executer(f"""
       var v = ss.getSheetByName('Consultations').getDataRange().getDisplayValues();
       var out = [];
@@ -158,6 +192,44 @@ def deposer(c: Consultation, cr: str, essai: bool = False) -> str:
     """Ajoute le CR à la fiche (sans effacer l'existant). Renvoie la clé de fiche."""
     entete = f"— CR de consultation dicté le {datetime.now():%d/%m/%Y à %Hh%M} —"
     cle = f"{c.iso}_{norm_nom(c.patient)}_cs"
+    try:
+        return _deposer_eval(c, cle, entete, cr, essai)
+    except ApiSecurisee:
+        return _deposer_api(c, cle, entete, cr, essai)
+
+
+def _deposer_api(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -> str:
+    """Via l'action « save_suivi » : on reprend les champs existants du patient, car
+    cette action réécrit aussi matériel / remarques / anapath de ses lignes Biopsies et actes."""
+    d = lire_tout()
+    pat = norm_nom(c.patient)
+    ligne = next((r for r in d.get("Consultations", []) if int(r.get("_row", 0)) == c.row), None)
+    if not ligne or norm_nom(ligne.get("Identité Patient", "")) != pat:
+        raise RuntimeError("dépôt refusé : la ligne du patient a changé dans l'agenda")
+    ent = dict((d.get("suivi_bloc") or {}).get(cle) or {})
+    for onglet in ("Biopsies", "actes"):
+        for r in d.get(onglet, []):
+            if norm_nom(r.get("Identité Patient", "")) == pat:
+                ent.setdefault("materiel", r.get("Matériel utilisé", ""))
+                ent.setdefault("remarques", r.get("Remarques (Bloc)") or r.get("Remarques & Suivi", ""))
+                ent.setdefault("anapath", r.get("Anatomopathologie", ""))
+    avant = ent.get("suivi_cs") or ligne.get("Remarques de suivi", "")
+    texte = (avant + "\n\n" if avant else "") + entete + "\n" + cr.strip()
+    if len(texte) > 5000:
+        texte = (entete + "\n" + cr.strip())[:5000]
+    if essai:
+        return json.dumps({"ok": True, "essai": True, "api": "securisee", "longueur": len(texte), "avant": len(avant)})
+    ent.update(suivi_key=cle, row=c.row, patient_name=c.patient, iso_date=c.iso, category="cs",
+               title=c.titre, suivi_cs=texte, updated_at=datetime.now().astimezone().isoformat())
+    for k in ("materiel", "remarques", "anapath", "ipp"):
+        ent.setdefault(k, "")
+    rep = poster({"action": "save_suivi", "entry": ent})
+    if rep.get("status") != "ok" or "Consultations" not in str(rep.get("result")):
+        raise RuntimeError(f"dépôt refusé par l'agenda : {str(rep)[:200]}")
+    return cle
+
+
+def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -> str:
     resultat = executer(f"""
       var row = {c.row}, pat = {json.dumps(c.patient)}, cle = {json.dumps(cle)};
       var bloc = {json.dumps(entete + chr(10) + cr.strip())};

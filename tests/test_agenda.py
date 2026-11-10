@@ -39,3 +39,44 @@ class TestAgenda(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestApiSecurisee(unittest.TestCase):
+    """Script de l'agenda sécurisé : code dynamique refusé → actions read_all / save_suivi."""
+
+    def setUp(self):
+        from ecoute import agenda
+        self.agenda, self.envois = agenda, []
+        donnees = {
+            "Consultations": [{"_row": 11, "Date": "09/11/2026", "Horaire": "09h30",
+                               "Identité Patient": "M. KERVARECH Yann", "Médecin en charge": TL,
+                               "Type d'acte / Consultation": "CS", "Remarques de suivi": "ancien"}],
+            "actes": [{"Identité Patient": "M. KERVARECH Yann", "Matériel utilisé": "aiguille 13G",
+                       "Remarques (Bloc)": "RAS"}],
+            "Biopsies": [], "suivi_bloc": {},
+        }
+
+        def poster(charge):
+            self.envois.append(charge)
+            if "eval_code" in charge:
+                return {"status": "forbidden"}
+            if charge.get("action") == "read_all":
+                return {"status": "ok", "evalResult": donnees}
+            return {"status": "ok", "result": {"updated": ["Consultations:11", "actes:4"]}}
+
+        self.ancien, agenda.poster = agenda.poster, poster
+
+    def tearDown(self):
+        self.agenda.poster = self.ancien
+
+    def test_lecture_et_depot_sans_ecraser(self):
+        cs = self.agenda.consultations_du(datetime(2026, 11, 9))
+        self.assertEqual([(c.row, c.horaire) for c in cs], [(11, "09h30")])
+        self.agenda.deposer(cs[0], "Nouveau CR")
+        ent = self.envois[-1]["entry"]
+        self.assertEqual(self.envois[-1]["action"], "save_suivi")
+        self.assertEqual(ent["materiel"], "aiguille 13G")  # conservé
+        self.assertEqual(ent["remarques"], "RAS")
+        self.assertTrue(ent["suivi_cs"].startswith("ancien\n\n— CR de consultation dicté"))
+        self.assertTrue(ent["suivi_cs"].endswith("Nouveau CR"))
+        self.assertEqual(ent["suivi_key"], "2026-11-09_kervarechyann_cs")
