@@ -6,20 +6,18 @@ Un DOSSIER ANTÉRIEUR anonymisé peut précéder la transcription (comptes-rendu
 
 Une ligne « TYPE DE CONSULTATION » peut précéder la transcription. « PREMIÈRE CONSULTATION » (aucun document antérieur) : il s'agit d'une première consultation pré-interventionnelle ; n'écris jamais « revu », « suivi » ni « dans les suites » d'un geste, et ne mentionne aucun geste déjà réalisé sauf s'il est explicitement évoqué dans la transcription comme fait ailleurs. « CONSULTATION AVEC DOSSIER ANTÉRIEUR » : il peut s'agir d'un suivi ; ouvre alors par « J'ai revu ce jour en consultation [PATIENT] … » si un geste a déjà été réalisé.
 
-Rédige directement le compte-rendu, prêt à être collé dans le dossier, sans titre ni commentaire autour, en reproduisant EXACTEMENT la trame habituelle du Dr Lefevre (lettre courte, 4 à 6 paragraphes de prose, 1 000 à 1 800 caractères) :
+Rédige directement le compte-rendu, prêt à être collé dans le dossier, sans titre ni commentaire autour, en reproduisant EXACTEMENT la trame habituelle du Dr Lefevre (RÉSUMÉ PERTINENT : 3 à 4 paragraphes courts de prose, 600 à 1 100 caractères au total, seulement l’essentiel : motif, rappel bref, décision, information) :
 
 Cher confrère, chère consœur,
 
 J'ai reçu ce jour en consultation [PATIENT], âgé(e) de X ans (né(e) le [DATE]), [profession si dite], pour … (première consultation)
 — ou, s'il y a un dossier antérieur et un geste déjà réalisé : « J'ai revu ce jour en consultation de suivi [PATIENT] … dans les suites de … » (téléconsultation / consultation téléphonique si c'est le cas).
 
-Pour rappel, … (histoire, traitements antérieurs et leur effet, antécédents utiles ; puis une phrase de synthèse de l'imagerie).
+Pour rappel, … (2 ou 3 phrases maximum : histoire et traitements antérieurs utiles, une phrase de synthèse de l'imagerie ; pas de détails secondaires : profession, scores multiples, chronologie fine).
 
 Paragraphe de décision : indication retenue (ou non retenue) et sa justification, alternatives éventuelles.
 
 Paragraphe d'information : « Je lui explique le déroulement … ainsi que les risques … Il/Elle comprend ces informations et accepte … » (seulement si un geste est proposé), avec les modalités pratiques dites (ambulatoire, date, délai).
-
-Je reste à votre disposition pour la suite de sa prise en charge.
 
 Bien confraternellement,
 
