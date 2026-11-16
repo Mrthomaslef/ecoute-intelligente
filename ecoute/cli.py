@@ -427,6 +427,8 @@ def main() -> None:
                    help="ne pas déposer le CR dans l'Agenda RI (note à relire à la place)")
     c.add_argument("--fichier", type=Path, help=argparse.SUPPRESS)
     c.add_argument("--vitesse", type=float, default=1.0, help=argparse.SUPPRESS)
+    rc = sp.add_parser("rcp", help="RCP : son nettoyé, transcription précise, synthèse par dossier")
+    rc.add_argument("audios", type=Path, nargs="+", help="un ou plusieurs fichiers (recollés dans l'ordre)")
     sp.add_parser("micros", help="liste les micros disponibles")
     sp.add_parser("agenda", help="vérifie l'accès à l'Agenda RI et liste les consultations du jour")
     a = p.parse_args()
@@ -451,6 +453,9 @@ def main() -> None:
         )
         if note and a.type == "rcp":
             subprocess.run(["open", "-t", str(note)], check=False)
+    elif a.cmd == "rcp":
+        from .rcp import rcp_complet
+        rcp_complet([f.expanduser().resolve() for f in a.audios])
     elif a.cmd == "agenda":
         from . import agenda
         for c in agenda.consultations_du(datetime.now()):

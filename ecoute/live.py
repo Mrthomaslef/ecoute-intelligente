@@ -227,4 +227,11 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
             cli.log(f"Passe finale impossible ({e}) : on garde la transcription du direct.")
     if type_note == "cr" and agenda_auto:
         return cli.consultation_vers_agenda(brut, wav_chemin, debut)
+    if type_note == "rcp" and fichier is None:
+        # RCP : on repart du fichier audio (son nettoyé, modèle précis), Claude réorganise.
+        from .rcp import rcp_complet
+        try:
+            return rcp_complet([wav_chemin], debut, ouvrir=False)
+        except Exception as e:  # noqa: BLE001 — repli : note de direct à relire
+            cli.log(f"Traitement RCP impossible ({e}) : note du direct à relire.")
     return cli.creer_note(brut, type_note, wav_chemin)

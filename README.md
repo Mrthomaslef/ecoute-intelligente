@@ -81,3 +81,7 @@ Les trames de rédaction se modifient dans `prompts/cr.md` et `prompts/rcp.md`.
 - Le dossier de travail est placé dans `~/EcouteIntelligente` et non dans `~/Documents`, qui peut être synchronisé avec iCloud (iCloud n'est pas un hébergeur certifié HDS).
 - Les noms de fichiers sont horodatés pour ne jamais reprendre le nom de l'audio.
 - Claude est appelé via `claude -p`, sans outils et sans historique de session. Variables d'environnement : `ECOUTE_MODELE` (par défaut `sonnet`), `ECOUTE_DOSSIER`, `ECOUTE_WHISPER`.
+
+## RCP : réorganisation après coup
+
+En RCP, le micro du MacBook capte de loin : la transcription du direct est médiocre. À la fin de l'écoute 🟢 RCP (ou à la main : `ecoute rcp fichier1.wav [fichier2.wav…]`, plusieurs morceaux recollés dans l'ordre), le son est nettoyé et remonté (ffmpeg), retranscrit avec Whisper large-v3 complet, anonymisé localement, puis Claude **réorganise dossier par dossier** (question, synthèse, décision, geste, examens, hémostase, suivi), liste les passages non compris, les actions et les brouillons de mails → `4_CR_Prets`. Pour une meilleure prise de son : micro de table ou micro de l'iPhone (`ecoute micros`).
