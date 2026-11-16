@@ -37,6 +37,7 @@ fi
 echo "Préchargement du modèle Whisper (≈1,6 Go, une seule fois)…"
 .venv/bin/python -c "from huggingface_hub import snapshot_download as d; d('mlx-community/whisper-large-v3-turbo')"
 
+command -v brew >/dev/null && ! command -v rclone >/dev/null && brew install rclone
 if ! command -v claude >/dev/null; then
   echo "Installation de Claude Code…"
   curl -fsSL https://claude.ai/install.sh | bash || echo "⚠️  Claude Code absent : curl -fsSL https://claude.ai/install.sh | bash"

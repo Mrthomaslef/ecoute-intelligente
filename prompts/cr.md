@@ -11,7 +11,7 @@ Un paragraphe unique standardisé : motif et contexte, antécédents utiles, tra
 Liste courte : hémostase (molécule, arrêt / reprise), allergies (iode, latex), contre-indications IRM, structures nobles à protéger.
 
 ## Courrier au confrère
-Brouillon bref et cordial adressé au médecin adresseur (« Cher confrère, »), signé « Dr Thomas Lefèvre, Radiologie B, Hôpital Cochin ».
+Brouillon bref et cordial adressé au médecin adresseur (« Cher confrère, »), signé « Dr Thomas Lefevre, Radiologie B, Hôpital Cochin ».
 
 Règles :
 - N'invente aucune donnée absente de la transcription : écris [À COMPLÉTER] à la place.

@@ -256,7 +256,7 @@ def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool) 
     return cle
 
 
-def reidentifier(cr: str, c: Consultation) -> str:
+def reidentifier(cr: str, c: Consultation, tronquer: bool = True) -> str:
     """Remet localement l'identité du patient à la place de la balise [PATIENT]."""
     cr = cr.replace("[PATIENT]", c.patient)
-    return cr if len(cr) <= LIMITE_CHAMP else cr[:LIMITE_CHAMP].rsplit("\n", 1)[0] + "\n[…] (CR complet dans 4_CR_Prets)"
+    return cr if not tronquer or len(cr) <= LIMITE_CHAMP else cr[:LIMITE_CHAMP].rsplit("\n", 1)[0] + "\n[…] (CR complet dans 4_CR_Prets)"

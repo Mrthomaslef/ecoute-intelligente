@@ -218,7 +218,8 @@ def creer_note(brut: str, type_note: str, audio: Path | None = None,
 
 
 # --------------------------------------------------------------- rédaction
-def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None = None) -> Path:
+def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None = None,
+            contexte: str | None = None) -> Path:
     entete, corps = lire_note(note)
     type_note = entete.get("type", "cr").lower()
     if type_note not in {"cr", "rcp"}:
@@ -228,7 +229,13 @@ def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None =
     if res.remplacements:
         log(f"Seconde passe : {dict(res.remplacements)} masqué(s) en plus.")
     consigne = (RACINE_PROJET / "prompts" / f"{trame or type_note}.md").read_text(encoding="utf-8")
-    entree = f"{consigne}\n\n---\nTRANSCRIPTION ANONYMISÉE :\n\n{res.texte}\n"
+    entree = f"{consigne}\n\n"
+    if contexte:  # dossier antérieur du patient, anonymisé avec les mêmes listes de noms
+        ctx = anonymiser(contexte, charger_liste_noms(LISTE_NOMS) + list(noms_extra or []))
+        log(f"Dossier antérieur joint ({len(ctx.texte)} caractères, "
+            f"{sum(ctx.remplacements.values())} élément(s) masqué(s)).")
+        entree += f"---\nDOSSIER ANTÉRIEUR ANONYMISÉ :\n\n{ctx.texte}\n\n"
+    entree += f"---\nTRANSCRIPTION ANONYMISÉE :\n\n{res.texte}\n"
     log(f"Rédaction par Claude ({MODELE_CLAUDE})…")
     cmd = [
         os.environ.get("ECOUTE_CLAUDE", "claude"), "-p",
@@ -258,30 +265,52 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime) -> 
     """Tout automatique : anonymisation → Claude → CR déposé dans la fiche patient de l'agenda."""
     from . import agenda
 
+    from . import dossier
+
+    # Dossier antérieur déposé dans Drive (« 1sceenshot et texte com / Consultation JJ/MM »)
+    doc, contexte = None, None
+    try:
+        doc = dossier.dossier_anterieur(DOSSIER, debut)
+        if doc:
+            contexte = dossier.lire(doc)
+            log(f"Dossier antérieur trouvé dans Drive (déposé à {doc.modifie:%Hh%M}).")
+        else:
+            log("Aucun dossier antérieur dans Drive pour cette consultation.")
+    except Exception as e:  # noqa: BLE001 — le CR est produit même sans dossier antérieur
+        log(f"Dossier Drive non lu ({e}).")
+    titre = doc.titre if doc else ""
+
     consultations, patient = [], None
     try:
         consultations = agenda.consultations_du(debut)
-        patient = agenda.choisir(consultations, debut, brut)
+        # Le titre du document (souvent le nom du patient) aide à retrouver la bonne fiche.
+        patient = agenda.choisir(consultations, debut, f"{brut}\n{titre}")
     except Exception as e:  # noqa: BLE001 — l'agenda est un bonus : le CR est produit quand même
         log(f"Agenda inaccessible ({e}).")
-    # Les noms des patients du jour sont masqués avant tout envoi à Claude.
-    noms = sorted({m for c in consultations for m in agenda.mots_du_nom(c.patient)}, key=len, reverse=True)
+    # Les noms des patients du jour (et le titre du document) sont masqués avant tout envoi à Claude.
+    noms = sorted({m for c in consultations for m in agenda.mots_du_nom(c.patient)}
+                  | set(agenda.mots_du_nom(titre)), key=len, reverse=True)
     note = creer_note(brut, "cr", audio, noms)
-    sortie = rediger(note, noms, trame="consultation")
+    sortie = rediger(note, noms, trame="consultation", contexte=contexte)
+    if doc:
+        dossier.marquer_utilise(DOSSIER, debut, doc)
     _, cr = lire_note(sortie)
+    final = agenda.reidentifier(cr, patient, tronquer=False) if patient else cr
+    pret = chemin_libre(PRETS, f"{sortie.stem}_a_copier", ".txt")
+    pret.write_text(final.strip() + "\n", encoding="utf-8")
+    subprocess.run(["pbcopy"], input=final.strip(), text=True, check=False)
+    subprocess.run(["open", "-t", str(pret)], check=False)
     if not patient:
-        notifier("Patient non trouvé dans l'agenda : CR prêt dans 4_CR_Prets.")
-        subprocess.run(["open", "-t", str(sortie)], check=False)
+        notifier("CR prêt et copié (⌘V). Patient non trouvé dans l'agenda.")
         return sortie
     try:
         agenda.deposer(patient, agenda.reidentifier(cr, patient))
     except Exception as e:  # noqa: BLE001
         log(f"Dépôt dans l'agenda impossible ({e}).")
-        notifier("Dépôt dans l'agenda impossible : CR prêt dans 4_CR_Prets.")
-        subprocess.run(["open", "-t", str(sortie)], check=False)
+        notifier("CR prêt et copié (⌘V). Dépôt dans l'agenda impossible.")
         return sortie
     log(f"→ CR déposé dans l'agenda : consultation de {patient.horaire or '?'} ({patient.date}).")
-    notifier(f"CR déposé dans l'agenda : {patient.patient} ({patient.horaire}).")
+    notifier(f"CR prêt et copié (⌘V), déposé dans l'agenda : {patient.patient} ({patient.horaire}).")
     return sortie
 
 
