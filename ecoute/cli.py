@@ -219,7 +219,7 @@ def creer_note(brut: str, type_note: str, audio: Path | None = None,
 
 # --------------------------------------------------------------- rédaction
 def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None = None,
-            contexte: str | None = None) -> Path:
+            contexte: str | None = None, premiere: bool | None = None) -> Path:
     entete, corps = lire_note(note)
     type_note = entete.get("type", "cr").lower()
     if type_note not in {"cr", "rcp"}:
@@ -235,6 +235,11 @@ def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None =
         log(f"Dossier antérieur joint ({len(ctx.texte)} caractères, "
             f"{sum(ctx.remplacements.values())} élément(s) masqué(s)).")
         entree += f"---\nDOSSIER ANTÉRIEUR ANONYMISÉ :\n\n{ctx.texte}\n\n"
+    if premiere is True:
+        entree += ("---\nTYPE DE CONSULTATION : PREMIÈRE CONSULTATION (aucun document antérieur "
+                   "au nom du patient).\n\n")
+    elif premiere is False:
+        entree += "---\nTYPE DE CONSULTATION : CONSULTATION AVEC DOSSIER ANTÉRIEUR (suivi possible).\n\n"
     entree += f"---\nTRANSCRIPTION ANONYMISÉE :\n\n{res.texte}\n"
     log(f"Rédaction par Claude ({MODELE_CLAUDE})…")
     cmd = [
@@ -268,31 +273,32 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
 
     from . import dossier
 
-    # Dossier antérieur déposé dans Drive (« 1sceenshot et texte com / Consultation JJ/MM »)
-    doc, contexte = None, None
-    try:
-        doc = dossier.dossier_anterieur(DOSSIER, debut, fin)
-        if doc:
-            contexte = dossier.lire(doc)
-            log(f"Dossier antérieur trouvé dans Drive (déposé à {doc.modifie:%Hh%M}).")
-        else:
-            log("Aucun dossier antérieur dans Drive pour cette consultation.")
-    except Exception as e:  # noqa: BLE001 — le CR est produit même sans dossier antérieur
-        log(f"Dossier Drive non lu ({e}).")
-    titre = doc.titre if doc else ""
-
     consultations, patient = [], None
     try:
         consultations = agenda.consultations_du(debut)
-        # Le titre du document (souvent le nom du patient) aide à retrouver la bonne fiche.
-        patient = agenda.choisir(consultations, debut, f"{brut}\n{titre}")
+        patient = agenda.choisir(consultations, debut, brut)
     except Exception as e:  # noqa: BLE001 — l'agenda est un bonus : le CR est produit quand même
         log(f"Agenda inaccessible ({e}).")
+
+    # Dossier antérieur déposé dans Drive (« 1sceenshot et texte com / Consultation JJ/MM ») :
+    # uniquement un document AU NOM du patient. Aucun document = première consultation.
+    doc, contexte, premiere = None, None, None
+    if patient:
+        try:
+            doc, contexte = dossier.document_du_patient(debut, fin, agenda.mots_du_nom(patient.patient))
+            premiere = doc is None
+            log(f"Dossier antérieur trouvé dans Drive : « {doc.titre} »." if doc
+                else "Aucun document au nom du patient dans Drive : première consultation.")
+        except Exception as e:  # noqa: BLE001 — le CR est produit même sans dossier antérieur
+            log(f"Dossier Drive non lu ({e}).")
+    else:
+        log("Patient non identifié : aucun dossier antérieur joint.")
+    titre = doc.titre if doc else ""
     # Les noms des patients du jour (et le titre du document) sont masqués avant tout envoi à Claude.
     noms = sorted({m for c in consultations for m in agenda.mots_du_nom(c.patient)}
                   | set(agenda.mots_du_nom(titre)), key=len, reverse=True)
     note = creer_note(brut, "cr", audio, noms)
-    sortie = rediger(note, noms, trame="consultation", contexte=contexte)
+    sortie = rediger(note, noms, trame="consultation", contexte=contexte, premiere=premiere)
     if doc:
         dossier.marquer_utilise(DOSSIER, debut, doc)
     _, cr = lire_note(sortie)

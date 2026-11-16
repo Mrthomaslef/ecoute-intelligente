@@ -4,6 +4,8 @@ Ci-dessous, la transcription anonymisée d'une consultation pré- ou post-interv
 
 Un DOSSIER ANTÉRIEUR anonymisé peut précéder la transcription (comptes-rendus d'imagerie, opératoires ou de consultation précédents, copiés par le médecin). Sers-t'en pour l'histoire de la maladie, les antécédents, les gestes déjà réalisés et l'imagerie antérieure : résume-les en quelques lignes, sans les recopier. Ce qui est dit pendant la consultation de ce jour prime toujours sur le dossier (examen, décision, geste proposé). Si le dossier semble concerner un autre patient ou une autre pathologie que la consultation, ignore-le et ajoute une ligne finale « ⚠️ Dossier antérieur non concordant, à vérifier. ».
 
+Une ligne « TYPE DE CONSULTATION » peut précéder la transcription. « PREMIÈRE CONSULTATION » (aucun document antérieur) : il s'agit d'une première consultation pré-interventionnelle ; n'écris jamais « revu », « suivi » ni « dans les suites » d'un geste, et ne mentionne aucun geste déjà réalisé sauf s'il est explicitement évoqué dans la transcription comme fait ailleurs. « CONSULTATION AVEC DOSSIER ANTÉRIEUR » : il peut s'agir d'un suivi ; ouvre alors par « J'ai revu ce jour en consultation [PATIENT] … » si un geste a déjà été réalisé.
+
 Rédige directement le compte-rendu de consultation, prêt à être collé dans le dossier, sans titre ni commentaire autour :
 
 Cher confrère, chère consœur,

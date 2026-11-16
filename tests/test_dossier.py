@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from ecoute.dossier import Document, choisir, deja_utilises, est_dossier_du_jour, marquer_utilise
+from ecoute.dossier import Document, choisir, concerne, document_du_patient, deja_utilises, est_dossier_du_jour, marquer_utilise
 
 JOUR = datetime(2026, 11, 16, 8, 30)
 
@@ -33,6 +33,22 @@ class TestDossier(unittest.TestCase):
             marquer_utilise(Path(d), JOUR, doc("a", 8, 20))
             self.assertEqual(deja_utilises(Path(d), JOUR), {"a"})
             self.assertEqual(deja_utilises(Path(d), datetime(2026, 11, 17)), set())
+
+    def test_document_au_nom_du_patient(self):
+        docs = [Document("r", "x/Rousselle", "Rousselle", datetime(2026, 11, 16, 8, 5)),
+                Document("b", "x/BETARI, Reem", "BETARI, Reem", datetime(2026, 11, 16, 8, 22)),
+                Document("c", "x/CR consultation", "CR consultation", datetime(2026, 11, 16, 8, 25))]
+        textes = {"r": "kyste", "b": "desmoide", "c": "Madame Cécile DOS SANTOS LOPES, Morton"}
+        lire = lambda d: textes[d.id]
+        fin = datetime(2026, 11, 16, 9, 0)
+        d, t = document_du_patient(JOUR, fin, ["BETARI", "Reem"], docs, lire)
+        self.assertEqual(d.id, "b")
+        d, t = document_du_patient(JOUR, fin, ["DOS", "SANTOS", "LOPES", "Cécile"], docs, lire)
+        self.assertEqual(d.id, "c")  # trouvé dans le texte
+        # Aucun document au nom du patient → première consultation, jamais le dossier d'un autre
+        self.assertEqual(document_du_patient(JOUR, fin, ["KHEZR"], docs, lire), (None, None))
+        self.assertTrue(concerne("Mme Dos Santos", ["SANTOS"]))
+        self.assertFalse(concerne("Mme Dos Santos", ["DOS"]))
 
 
 if __name__ == "__main__":

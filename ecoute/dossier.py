@@ -2,8 +2,9 @@
 
 Thomas copie le dossier précédent du patient dans
 « 1sceenshot et texte com / Consultation JJ/MM » juste avant de le recevoir.
-À la fin de l'écoute, on prend le document le plus récent de ce dossier (pas encore
-utilisé aujourd'hui), on en extrait le texte via rclone, et il sert de contexte au CR.
+À la fin de l'écoute, on prend le document de ce dossier qui CONCERNE LE PATIENT (son nom
+dans le titre ou le texte), on en extrait le texte via rclone, et il sert de contexte au CR.
+Aucun document au nom du patient = première consultation (jamais le dossier d'un autre patient).
 
 Le texte est anonymisé localement (comme la transcription) avant tout envoi à Claude.
 """
@@ -147,3 +148,30 @@ def dossier_anterieur(dossier: Path, debut: datetime, fin: datetime | None = Non
     """Trouve le document du jour (sans le lire). Lève une exception si Drive est inaccessible."""
     fin = fin or datetime.now()
     return choisir(documents_du_jour(debut), fin, deja_utilises(dossier, debut))
+
+
+# ------------------------------------------- document rattaché au patient
+def concerne(texte: str, mots_patient: list[str]) -> bool:
+    """Vrai si un mot du nom du patient (≥ 4 lettres) figure dans le texte (sans accents ni casse)."""
+    t = " " + re.sub(r"[^a-z]+", " ", _norm(texte)) + " "
+    return any(f" {re.sub(r'[^a-z]+', ' ', _norm(m)).strip()} " in t
+               for m in mots_patient if len(m) >= 4)
+
+
+def document_du_patient(debut: datetime, fin: datetime | None, mots_patient: list[str],
+                        docs: list[Document] | None = None, lecteur=None) -> tuple[Document | None, str | None]:
+    """Document du jour au nom du patient (titre d'abord, puis texte). (None, None) = première consultation."""
+    if not mots_patient:
+        return None, None
+    fin = fin or datetime.now()
+    lecteur = lecteur or lire
+    docs = documents_du_jour(debut) if docs is None else docs
+    candidats = sorted((d for d in docs if d.modifie <= fin), key=lambda d: d.modifie, reverse=True)
+    for d in candidats:
+        if concerne(d.titre, mots_patient):
+            return d, lecteur(d)
+    for d in candidats:
+        texte = lecteur(d)
+        if concerne(texte, mots_patient):
+            return d, texte
+    return None, None
