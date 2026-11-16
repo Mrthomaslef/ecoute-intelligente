@@ -209,6 +209,16 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
         wav_chemin.unlink(missing_ok=True)
         return None
     brut = "\n".join(textes)
+    from . import relais
+    if relais.est_enregistreur() and fichier is None and type_note == "cr":
+        # MacBook : le Mac mini fait la transcription finale, le dossier Drive, le CR et l'agenda.
+        try:
+            relais.envoyer(wav_chemin, debut, datetime.now(), type_note)
+            cli.log("Enregistrement envoyé au Mac mini (iCloud) : CR dans l'Agenda RI dans quelques minutes.")
+            cli.notifier("Enregistrement envoyé au Mac mini : le CR arrivera dans l'Agenda RI.")
+            return None
+        except Exception as e:  # noqa: BLE001 — repli : traitement complet sur ce Mac
+            cli.log(f"Envoi au Mac mini impossible ({e}) : traitement sur ce Mac.")
     if passe_finale and duree > 2:
         cli.log("Passe finale sur l'enregistrement complet (plus précise)…")
         try:

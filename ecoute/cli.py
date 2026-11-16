@@ -261,7 +261,8 @@ def notifier(message: str) -> None:
                    capture_output=True)
 
 
-def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime) -> Path:
+def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
+                             fin: datetime | None = None, poste_local: bool = True) -> Path:
     """Tout automatique : anonymisation → Claude → CR déposé dans la fiche patient de l'agenda."""
     from . import agenda
 
@@ -270,7 +271,7 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime) -> 
     # Dossier antérieur déposé dans Drive (« 1sceenshot et texte com / Consultation JJ/MM »)
     doc, contexte = None, None
     try:
-        doc = dossier.dossier_anterieur(DOSSIER, debut)
+        doc = dossier.dossier_anterieur(DOSSIER, debut, fin)
         if doc:
             contexte = dossier.lire(doc)
             log(f"Dossier antérieur trouvé dans Drive (déposé à {doc.modifie:%Hh%M}).")
@@ -298,10 +299,14 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime) -> 
     final = agenda.reidentifier(cr, patient, tronquer=False) if patient else cr
     pret = chemin_libre(PRETS, f"{sortie.stem}_a_copier", ".txt")
     pret.write_text(final.strip() + "\n", encoding="utf-8")
-    subprocess.run(["pbcopy"], input=final.strip(), text=True, check=False)
-    subprocess.run(["open", "-t", str(pret)], check=False)
+    if poste_local:  # consultation traitée sur le Mac utilisé : CR prêt à coller
+        subprocess.run(["pbcopy"], input=final.strip(), text=True, check=False)
+        subprocess.run(["open", "-t", str(pret)], check=False)
     if not patient:
-        notifier("CR prêt et copié (⌘V). Patient non trouvé dans l'agenda.")
+        log("Patient non trouvé dans l'agenda : CR dans 4_CR_Prets.")
+        notifier("CR prêt (4_CR_Prets). Patient non trouvé dans l'agenda.")
+        if not poste_local:
+            subprocess.run(["open", "-t", str(pret)], check=False)
         return sortie
     try:
         agenda.deposer(patient, agenda.reidentifier(cr, patient))
@@ -331,8 +336,10 @@ def fichiers_stables(dossier: Path, exts: set[str], tailles: dict[Path, int]) ->
 
 
 def surveiller(intervalle: float) -> None:
+    from . import relais
+
     initialiser()
-    log(f"Surveillance de {DOSSIER} (Ctrl+C pour arrêter)")
+    log(f"Surveillance de {DOSSIER} (Ctrl+C pour arrêter) — mode {relais.mode()}")
     tailles: dict[Path, int] = {}
     echecs: set[Path] = set()
     while True:
@@ -345,6 +352,15 @@ def surveiller(intervalle: float) -> None:
                 except Exception as e:  # noqa: BLE001
                     echecs.add(audio)
                     log(f"ERREUR transcription {audio.name} : {e}")
+        if not relais.est_enregistreur():  # Mac mini : enregistrements envoyés par le MacBook
+            for wav, info in relais.a_traiter():
+                if wav in echecs:
+                    continue
+                try:
+                    relais.traiter(wav, info)
+                except Exception as e:  # noqa: BLE001
+                    echecs.add(wav)
+                    log(f"ERREUR relais {wav.name} : {e}")
         for note in fichiers_stables(VALIDE, {".md"}, tailles):
             if note in echecs:
                 continue
