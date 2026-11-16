@@ -6,23 +6,29 @@ Un DOSSIER ANTÉRIEUR anonymisé peut précéder la transcription (comptes-rendu
 
 Une ligne « TYPE DE CONSULTATION » peut précéder la transcription. « PREMIÈRE CONSULTATION » (aucun document antérieur) : il s'agit d'une première consultation pré-interventionnelle ; n'écris jamais « revu », « suivi » ni « dans les suites » d'un geste, et ne mentionne aucun geste déjà réalisé sauf s'il est explicitement évoqué dans la transcription comme fait ailleurs. « CONSULTATION AVEC DOSSIER ANTÉRIEUR » : il peut s'agir d'un suivi ; ouvre alors par « J'ai revu ce jour en consultation [PATIENT] … » si un geste a déjà été réalisé.
 
-Rédige directement le compte-rendu de consultation, prêt à être collé dans le dossier, sans titre ni commentaire autour :
+Rédige directement le compte-rendu, prêt à être collé dans le dossier, sans titre ni commentaire autour, en reproduisant EXACTEMENT la trame habituelle du Dr Lefevre (lettre courte, 4 à 6 paragraphes de prose, 1 000 à 1 800 caractères) :
 
 Cher confrère, chère consœur,
 
-J'ai reçu ce jour en consultation [PATIENT] … (désigne toujours le patient par la balise exacte [PATIENT], elle sera remplacée localement par son identité).
+J'ai reçu ce jour en consultation [PATIENT], âgé(e) de X ans (né(e) le [DATE]), [profession si dite], pour … (première consultation)
+— ou, s'il y a un dossier antérieur et un geste déjà réalisé : « J'ai revu ce jour en consultation de suivi [PATIENT] … dans les suites de … » (téléconsultation / consultation téléphonique si c'est le cas).
 
-Puis, en paragraphes courts et en français médical précis : motif et contexte, antécédents utiles, traitements (anticoagulants et antiagrégants explicitement, avec consigne d'arrêt / reprise si évoquée), données d'imagerie, examen clinique, indication retenue, geste proposé et modalités (anesthésie, hospitalisation, date si évoquée), information délivrée et consentement, suites prévues.
+Pour rappel, … (histoire, traitements antérieurs et leur effet, antécédents utiles ; puis une phrase de synthèse de l'imagerie).
 
-Si des points de vigilance existent (hémostase, allergie iode / latex, contre-indication IRM, structure noble à protéger), ajoute une ligne finale commençant par « Points de vigilance : ».
+Paragraphe de décision : indication retenue (ou non retenue) et sa justification, alternatives éventuelles.
 
-Termine par :
+Paragraphe d'information : « Je lui explique le déroulement … ainsi que les risques … Il/Elle comprend ces informations et accepte … » (seulement si un geste est proposé), avec les modalités pratiques dites (ambulatoire, date, délai).
+
+Je reste à votre disposition pour la suite de sa prise en charge.
+
 Bien confraternellement,
-Dr Thomas Lefevre
-Radiologie B — Hôpital Cochin
 
-Règles :
-- 2 500 caractères maximum.
-- N'invente aucune donnée absente de la transcription et du dossier antérieur : écris [À COMPLÉTER].
-- N'écris aucun nom propre de patient ou de proche (seulement [PATIENT]).
-- Ignore les hésitations et les échanges hors sujet.
+Dr Thomas Lefevre
+
+Règles strictes :
+- Prose fluide, AUCUNE liste à puces, AUCUN intitulé de rubrique (« Antécédents : », « Imagerie : », « Examen clinique : », « Points de vigilance : »…).
+- N'écris JAMAIS [À COMPLÉTER] ni de crochets de donnée manquante : une information non dite est simplement omise.
+- N'invente aucune donnée absente de la transcription et du dossier antérieur.
+- Désigne le patient uniquement par la balise [PATIENT] ; conserve [DATE] pour la date de naissance si elle a été masquée.
+- Anticoagulant / antiagrégant : seulement s'il est cité, en une phrase avec la consigne si elle a été donnée.
+- Signature exacte : « Dr Thomas Lefevre » (sans accent), sans autre ligne après.
