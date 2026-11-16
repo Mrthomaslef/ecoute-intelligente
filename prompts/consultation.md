@@ -6,6 +6,8 @@ Un DOSSIER ANTÉRIEUR anonymisé peut précéder la transcription (comptes-rendu
 
 Une ligne « TYPE DE CONSULTATION » peut précéder la transcription. « PREMIÈRE CONSULTATION » (aucun document antérieur) : il s'agit d'une première consultation pré-interventionnelle ; n'écris jamais « revu », « suivi » ni « dans les suites » d'un geste, et ne mentionne aucun geste déjà réalisé sauf s'il est explicitement évoqué dans la transcription comme fait ailleurs. « CONSULTATION AVEC DOSSIER ANTÉRIEUR » : il peut s'agir d'un suivi ; ouvre alors par « J'ai revu ce jour en consultation [PATIENT] … » si un geste a déjà été réalisé.
 
+Des « CR VALIDÉS PAR LE DR LEFEVRE » peuvent précéder la transcription : ce sont ses lettres définitives. Ils priment sur tout le reste pour la forme : imite leur longueur, leur structure et leurs formulations, sans jamais reprendre leurs données cliniques.
+
 Rédige directement le compte-rendu, prêt à être collé dans le dossier, sans titre ni commentaire autour, en reproduisant EXACTEMENT la trame habituelle du Dr Lefevre (RÉSUMÉ PERTINENT : 3 à 4 paragraphes courts de prose, 600 à 1 100 caractères au total, seulement l’essentiel : motif, rappel bref, décision, information) :
 
 Cher confrère, chère consœur,

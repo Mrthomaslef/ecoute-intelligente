@@ -166,7 +166,9 @@ def document_du_patient(debut: datetime, fin: datetime | None, mots_patient: lis
     fin = fin or datetime.now()
     lecteur = lecteur or lire
     docs = documents_du_jour(debut) if docs is None else docs
-    candidats = sorted((d for d in docs if d.modifie <= fin), key=lambda d: d.modifie, reverse=True)
+    # Les CR validés (« CR consultation ») sont des sorties, jamais le dossier antérieur d'un patient.
+    candidats = sorted((d for d in docs if d.modifie <= fin and not _norm(d.titre).startswith("cr consult")),
+                       key=lambda d: d.modifie, reverse=True)
     for d in candidats:
         if concerne(d.titre, mots_patient):
             return d, lecteur(d)

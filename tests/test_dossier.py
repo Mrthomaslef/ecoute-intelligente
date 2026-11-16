@@ -37,7 +37,7 @@ class TestDossier(unittest.TestCase):
     def test_document_au_nom_du_patient(self):
         docs = [Document("r", "x/Rousselle", "Rousselle", datetime(2026, 11, 16, 8, 5)),
                 Document("b", "x/BETARI, Reem", "BETARI, Reem", datetime(2026, 11, 16, 8, 22)),
-                Document("c", "x/CR consultation", "CR consultation", datetime(2026, 11, 16, 8, 25))]
+                Document("c", "x/Notes du jour", "Notes du jour", datetime(2026, 11, 16, 8, 25))]
         textes = {"r": "kyste", "b": "desmoide", "c": "Madame Cécile DOS SANTOS LOPES, Morton"}
         lire = lambda d: textes[d.id]
         fin = datetime(2026, 11, 16, 9, 0)

@@ -235,6 +235,18 @@ def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None =
         log(f"Dossier antérieur joint ({len(ctx.texte)} caractères, "
             f"{sum(ctx.remplacements.values())} élément(s) masqué(s)).")
         entree += f"---\nDOSSIER ANTÉRIEUR ANONYMISÉ :\n\n{ctx.texte}\n\n"
+    if (trame or type_note) == "consultation":
+        try:
+            from . import modeles
+            ex = modeles.exemples(DOSSIER)
+            if ex:
+                ex = [anonymiser(e, charger_liste_noms(LISTE_NOMS) + list(noms_extra or [])).texte for e in ex]
+                log(f"{len(ex)} CR validé(s) joint(s) comme modèles.")
+                entree += ("---\nCR VALIDÉS PAR LE DR LEFEVRE (modèles à imiter : style, longueur, concision, "
+                           "formulations ; ne reprends AUCUNE donnée de ces patients) :\n\n"
+                           + "\n\n=====\n\n".join(ex) + "\n\n")
+        except Exception as e:  # noqa: BLE001 — les modèles sont un bonus
+            log(f"CR validés non lus ({e}).")
     if premiere is True:
         entree += ("---\nTYPE DE CONSULTATION : PREMIÈRE CONSULTATION (aucun document antérieur "
                    "au nom du patient).\n\n")
