@@ -42,9 +42,14 @@ def est_enregistreur() -> bool:
 def envoyer(wav: Path, debut: datetime, fin: datetime, type_note: str) -> Path:
     """Copie l'enregistrement dans iCloud (fiche JSON écrite en dernier = copie complète)."""
     RELAIS.mkdir(parents=True, exist_ok=True)
-    cible = cli.chemin_libre(RELAIS, f"{debut:%Y-%m-%d_%Hh%M}_{type_note}", ".wav")
+    # Compression AAC (≈6× plus léger que le WAV, intégrée à macOS) : envoi rapide sur réseau lent.
+    cible = cli.chemin_libre(RELAIS, f"{debut:%Y-%m-%d_%Hh%M}_{type_note}", ".m4a")
     tmp = RELAIS / f".{cible.name}.partiel"
-    shutil.copy2(wav, tmp)
+    conv = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "48000", "-c", "1",
+                           str(wav), str(tmp)], capture_output=True)
+    if conv.returncode != 0 or not tmp.exists() or not tmp.stat().st_size:
+        cible = cible.with_suffix(".wav")  # repli : WAV d'origine
+        shutil.copy2(wav, tmp)
     tmp.rename(cible)
     fiche = {"debut": debut.isoformat(timespec="seconds"), "fin": fin.isoformat(timespec="seconds"),
              "type": type_note, "taille": cible.stat().st_size, "machine": os.uname().nodename}
@@ -65,12 +70,12 @@ def a_traiter() -> list[tuple[Path, dict]]:
     prets = []
     if not RELAIS.exists():
         return prets
-    for fiche in sorted(RELAIS.glob("*.wav.json")):
+    for fiche in sorted(RELAIS.glob("*.json")):
         try:
             info = json.loads(fiche.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        wav = fiche.with_suffix("")  # x.wav.json → x.wav
+        wav = fiche.with_suffix("")  # x.m4a.json → x.m4a
         _telecharger(wav)
         if not wav.exists():
             continue

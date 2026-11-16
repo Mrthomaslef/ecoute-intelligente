@@ -33,7 +33,7 @@ class TestRelais(unittest.TestCase):
         cible = relais.envoyer(wav, datetime(2026, 11, 16, 8, 48), datetime(2026, 11, 16, 8, 59), "cr")
         self.assertFalse(wav.exists())  # rangé dans _traites du MacBook
         self.assertEqual(len(list(cli.TRAITES.iterdir())), 1)
-        self.assertEqual(cible.name, "2026-11-16_08h48_cr.wav")
+        self.assertEqual(cible.stem, "2026-11-16_08h48_cr")
         prets = relais.a_traiter()
         self.assertEqual([w.name for w, _ in prets], [cible.name])
         self.assertEqual(prets[0][1]["fin"], "2026-11-16T08:59:00")
@@ -45,7 +45,16 @@ class TestRelais(unittest.TestCase):
         self.assertEqual(kw["fin"], datetime(2026, 11, 16, 8, 59))
         self.assertFalse(kw["poste_local"])
         self.assertEqual(relais.a_traiter(), [])  # fiche supprimée, WAV sorti d'iCloud
-        self.assertFalse(any(relais.RELAIS.glob("*.wav")))
+        self.assertEqual([f for f in relais.RELAIS.iterdir() if not f.name.startswith(".")], [])
+
+    def test_compression_m4a(self):
+        import subprocess
+        wav = self.tmp / "vrai.wav"
+        subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1",
+                        "/System/Library/Sounds/Glass.aiff", str(wav)], check=True)
+        cible = relais.envoyer(wav, datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 9, 5), "cr")
+        self.assertEqual(cible.suffix, ".m4a")
+        self.assertEqual([w for w, _ in relais.a_traiter()], [cible])
 
     def test_wav_incomplet_attendu(self):
         relais.RELAIS.mkdir(parents=True)
