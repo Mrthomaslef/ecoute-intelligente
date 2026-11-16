@@ -25,6 +25,8 @@ Le script installe ffmpeg, Whisper (MLX), précharge une fois le modèle `large-
 3. anonymisation locale (y compris les noms de tous les patients du jour) puis rédaction du CR de consultation par Claude ;
 4. réinsertion locale de l'identité et **dépôt du CR dans la fiche du patient** (« Remarques de suivi » / « Suivi clinique & recommandations CS »), à la suite de ce qui y figurait déjà. Une notification confirme le patient.
 
+Pendant toute l'écoute (consultation ou RCP), puis la transcription finale et la rédaction du CR, **le Mac ne se met pas en veille et l'écran reste allumé** ; la veille normale revient d'elle-même à la fin. ⚠️ Sur batterie, refermer l'écran met quand même le MacBook en veille : laissez-le ouvert.
+
 Si le patient n'est pas trouvé ou si l'agenda est inaccessible, le CR s'ouvre et reste dans `4_CR_Prets`. 🟢 **Écoute RCP** garde l'ancien circuit (note à relire puis `3_Valide`). Le code d'accès de l'agenda est demandé une seule fois par Mac (Trousseau) ; `ecoute agenda` vérifie l'accès.
 
 En ligne de commande :

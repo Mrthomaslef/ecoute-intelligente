@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import queue
+import subprocess
 import sys
 import threading
 import time
@@ -111,11 +112,28 @@ def consultation(type_note: str = "cr", appareil=None, fichier: Path | None = No
     cli.initialiser()
     EN_COURS.mkdir(parents=True, exist_ok=True)
     PID.write_text(str(os.getpid()))
+    reveil = empecher_veille()
     try:
         return _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final,
                              agenda_auto)
     finally:
         PID.unlink(missing_ok=True)
+        if reveil:
+            reveil.terminate()
+
+
+def empecher_veille() -> subprocess.Popen | None:
+    """Garde le Mac (et l'écran) éveillé pendant l'écoute, la transcription finale et le CR.
+
+    caffeinate -w s'arrête tout seul à la fin du processus, même en cas de plantage ;
+    start_new_session : le Ctrl+C de fin d'écoute ne doit pas l'arrêter trop tôt.
+    """
+    try:
+        return subprocess.Popen(["/usr/bin/caffeinate", "-dimsu", "-w", str(os.getpid())],
+                                start_new_session=True, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
 
 
 def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_final,
