@@ -38,7 +38,8 @@ class Document:
 
 
 def rclone() -> str | None:
-    for c in (shutil.which("rclone"), "/opt/homebrew/bin/rclone", "/usr/local/bin/rclone"):
+    for c in (shutil.which("rclone"), str(Path.home() / ".local/bin/rclone"),
+              "/opt/homebrew/bin/rclone", "/usr/local/bin/rclone"):
         if c and Path(c).exists():
             return c
     return None
