@@ -11,6 +11,7 @@ Le mode d'un Mac se règle dans ~/EcouteIntelligente/.mode (« enregistreur » o
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -65,7 +66,7 @@ def _telecharger(chemin: Path) -> None:
         subprocess.run(["brctl", "download", str(chemin)], capture_output=True)
 
 
-DELAI_REPLI = 5 * 60  # s : au-delà, le MacBook traite lui-même ce que le Mac mini n'a pas pris
+DELAI_REPLI = 30 * 60  # s : au-delà, le MacBook traite lui-même ce que le Mac mini n'a pas pris (lent : dernier recours)
 
 
 def a_traiter(anciennete_min: float = 0) -> list[tuple[Path, dict]]:
@@ -110,9 +111,51 @@ def traiter(wav: Path, info: dict) -> Path | None:
     # Le WAV quitte iCloud dès qu'il est pris en charge (rangé dans 1_Audio/_traites du Mac mini).
     if type_note == "cr":
         sortie = cli.consultation_vers_agenda(brut, wav, debut, fin=fin, poste_local=False)
+    elif type_note == "rcp":
+        # RCP : traitement complet (son nettoyé, modèle précis, synthèse dossier par dossier).
+        from .rcp import rcp_complet
+        try:
+            sortie = rcp_complet([wav], debut, ouvrir=False)
+        except Exception as e:  # noqa: BLE001 — repli : note à relire
+            cli.log(f"Synthèse RCP impossible ({e}) : note à relire.")
+            sortie = cli.creer_note(brut, type_note, wav)
     else:
         sortie = cli.creer_note(brut, type_note, wav)
     if wav.exists():
         shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
     fiche.unlink(missing_ok=True)
     return sortie
+
+
+# ------------------------------------------------- écoutes interrompues
+INTERROMPU_APRES = 10 * 60  # s sans écriture : l'écoute a été coupée (veille, plantage, bouton oublié)
+
+
+def ecoutes_interrompues(en_cours: Path, pid: Path, maintenant: float | None = None) -> list[Path]:
+    """WAV laissés dans _en_cours par une écoute qui ne s'est pas terminée normalement."""
+    maintenant = maintenant or time.time()
+    if pid.exists():  # une écoute est en cours : on ne touche à rien
+        return []
+    return [w for w in sorted(en_cours.glob("*.wav"))
+            if w.stat().st_size > 44 and maintenant - w.stat().st_mtime > INTERROMPU_APRES]
+
+
+def recuperer(wav: Path) -> None:
+    """Reprend une écoute interrompue : envoi au Mac mini (enregistreur) ou traitement ici."""
+    m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})h(\d{2})_(cr|rcp)", wav.stem)
+    debut = datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}", "%Y-%m-%d %H:%M") if m \
+        else datetime.fromtimestamp(wav.stat().st_mtime)
+    type_note = m.group(4) if m else "cr"
+    fin = datetime.fromtimestamp(wav.stat().st_mtime)
+    cli.log(f"Écoute interrompue retrouvée ({wav.name}) : reprise automatique.")
+    cli.notifier(f"Écoute interrompue de {debut:%Hh%M} récupérée et envoyée au traitement.")
+    if est_enregistreur():
+        envoyer(wav, debut, fin, type_note)
+        return
+    # Mac de traitement : on la dépose dans le relais local comme si elle venait du MacBook.
+    RELAIS.mkdir(parents=True, exist_ok=True)
+    cible = cli.chemin_libre(RELAIS, f"{debut:%Y-%m-%d_%Hh%M}_{type_note}", wav.suffix)
+    shutil.move(str(wav), cible)
+    (RELAIS / f"{cible.name}.json").write_text(json.dumps(
+        {"debut": debut.isoformat(timespec="seconds"), "fin": fin.isoformat(timespec="seconds"),
+         "type": type_note, "taille": cible.stat().st_size, "machine": os.uname().nodename}), encoding="utf-8")

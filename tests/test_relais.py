@@ -65,3 +65,23 @@ class TestRelais(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEcoutesInterrompues(unittest.TestCase):
+    def test_detection(self):
+        import os
+        import tempfile
+        import time
+        from pathlib import Path
+        from ecoute import relais
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            vieux, recent = d / "2026-11-16_12h02_rcp.wav", d / "2026-11-16_13h09_rcp.wav"
+            for f in (vieux, recent):
+                f.write_bytes(b"\0" * 1000)
+            maintenant = time.time()
+            os.utime(vieux, (maintenant - 3600, maintenant - 3600))
+            pid = d / ".pid"
+            self.assertEqual(relais.ecoutes_interrompues(d, pid, maintenant), [vieux])
+            pid.write_text("123")  # écoute en cours : on ne touche à rien
+            self.assertEqual(relais.ecoutes_interrompues(d, pid, maintenant), [])

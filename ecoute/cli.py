@@ -394,6 +394,18 @@ def surveiller(intervalle: float) -> None:
                 except Exception as e:  # noqa: BLE001
                     echecs.add(audio)
                     log(f"ERREUR transcription {audio.name} : {e}")
+        # Écoutes interrompues (veille, plantage) : reprises au lieu de rester oubliées dans _en_cours.
+        try:
+            from .live import EN_COURS, PID
+            for wav in relais.ecoutes_interrompues(EN_COURS, PID):
+                if wav not in echecs:
+                    try:
+                        relais.recuperer(wav)
+                    except Exception as e:  # noqa: BLE001
+                        echecs.add(wav)
+                        log(f"ERREUR reprise {wav.name} : {e}")
+        except Exception as e:  # noqa: BLE001
+            log(f"Contrôle des écoutes interrompues impossible ({e}).")
         # Mac mini : enregistrements envoyés par le MacBook. MacBook (enregistreur) : repli
         # automatique s'ils ne sont pas pris en charge à temps (iCloud bloqué, Mac mini éteint).
         delai = 0 if not relais.est_enregistreur() else relais.DELAI_REPLI

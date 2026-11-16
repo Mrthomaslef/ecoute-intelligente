@@ -159,9 +159,17 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
                 m, s = divmod(int(t0), 60)
                 print(f"\033[2m[{m:02d}:{s:02d}]\033[0m {texte}", flush=True)
 
-    # Charge le modèle avant de commencer (la première phrase ne doit pas attendre).
-    cli.log("Chargement du modèle Whisper…")
-    cli.transcrire(np.zeros(TAUX, dtype=np.float32))
+    from . import relais
+    # MacBook « enregistreur » : il ne fait QUE enregistrer (pas de Whisper en direct, trop lourd) ;
+    # le Mac mini transcrit tout. La parole est seulement détectée (segmenteur) pour l'arrêt automatique.
+    enregistreur = relais.est_enregistreur() and fichier is None
+    parole = [False]
+    if not enregistreur:
+        # Charge le modèle avant de commencer (la première phrase ne doit pas attendre).
+        cli.log("Chargement du modèle Whisper…")
+        cli.transcrire(np.zeros(TAUX, dtype=np.float32))
+    else:
+        cli.log("Mode enregistreur : enregistrement seul, la transcription sera faite par le Mac mini.")
     ouvrier = threading.Thread(target=transcripteur, daemon=True)
     ouvrier.start()
     capteur = threading.Thread(
@@ -186,7 +194,11 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
             for i in range(0, len(trame), TRAME):
                 phrase = seg.ajouter(trame[i:i + TRAME])
                 if phrase is not None:
-                    file_segments.put(((echantillons + i) / TAUX - len(phrase) / TAUX, phrase))
+                    parole[0] = True
+                    if enregistreur:
+                        dernier_texte[0] = time.monotonic()
+                    else:
+                        file_segments.put(((echantillons + i) / TAUX - len(phrase) / TAUX, phrase))
             echantillons += len(trame)
             if time.monotonic() - dernier_texte[0] > SILENCE_MAX or echantillons > DUREE_MAX * TAUX:
                 cli.log("Arrêt automatique (silence prolongé ou durée maximale atteinte).")
@@ -196,7 +208,7 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
         print()
     arret.set()
     capteur.join(timeout=2)
-    if (reste := seg.vider()) is not None:
+    if (reste := seg.vider()) is not None and not enregistreur:
         file_segments.put((echantillons / TAUX, reste))
     file_segments.put(None)
     cli.log("Fin de l'écoute, dernières phrases…")
@@ -205,17 +217,16 @@ def _consultation(type_note, appareil, fichier, vitesse, passe_finale, modele_fi
     duree = echantillons / TAUX
     cli.log(f"Enregistrement : {int(duree // 60)} min {int(duree % 60)} s")
 
-    if not textes:  # aucune parole (micro absent, bouton oublié…) : pas de note vide
+    if not textes and not parole[0]:  # aucune parole (micro absent, bouton oublié…) : pas de note vide
         wav_chemin.unlink(missing_ok=True)
         return None
     brut = "\n".join(textes)
-    from . import relais
-    if relais.est_enregistreur() and fichier is None and type_note == "cr":
-        # MacBook : le Mac mini fait la transcription finale, le dossier Drive, le CR et l'agenda.
+    if enregistreur:
+        # MacBook : le Mac mini fait toute la transcription (consultation ou RCP), le CR et l'agenda.
         try:
             relais.envoyer(wav_chemin, debut, datetime.now(), type_note)
-            cli.log("Enregistrement envoyé au Mac mini (iCloud) : CR dans l'Agenda RI dans quelques minutes.")
-            cli.notifier("Enregistrement envoyé au Mac mini : le CR arrivera dans l'Agenda RI.")
+            cli.log("Enregistrement envoyé au Mac mini (iCloud) : traitement dans quelques minutes.")
+            cli.notifier("Enregistrement envoyé au Mac mini : CR / synthèse dans quelques minutes.")
             return None
         except Exception as e:  # noqa: BLE001 — repli : traitement complet sur ce Mac
             cli.log(f"Envoi au Mac mini impossible ({e}) : traitement sur ce Mac.")
