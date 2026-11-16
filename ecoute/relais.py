@@ -65,8 +65,14 @@ def _telecharger(chemin: Path) -> None:
         subprocess.run(["brctl", "download", str(chemin)], capture_output=True)
 
 
-def a_traiter() -> list[tuple[Path, dict]]:
-    """Enregistrements complets présents dans le relais (WAV arrivé en entier)."""
+DELAI_REPLI = 5 * 60  # s : au-delà, le MacBook traite lui-même ce que le Mac mini n'a pas pris
+
+
+def a_traiter(anciennete_min: float = 0) -> list[tuple[Path, dict]]:
+    """Enregistrements complets présents dans le relais (audio arrivé en entier).
+
+    anciennete_min : ne garder que ceux déposés depuis au moins ce nombre de secondes.
+    """
     prets = []
     if not RELAIS.exists():
         return prets
@@ -74,6 +80,8 @@ def a_traiter() -> list[tuple[Path, dict]]:
         try:
             info = json.loads(fiche.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            continue
+        if anciennete_min and time.time() - fiche.stat().st_mtime < anciennete_min:
             continue
         wav = fiche.with_suffix("")  # x.m4a.json → x.m4a
         _telecharger(wav)

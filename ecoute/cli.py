@@ -259,6 +259,26 @@ def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None =
     return sortie
 
 
+# ------------------------------------------- transcriptions du jour
+TRANSCRIPTIONS = DOSSIER / "Transcriptions"
+
+
+def ajouter_transcription_du_jour(note: Path, debut: datetime, patient=None) -> Path:
+    """Ajoute la transcription anonymisée à ~/EcouteIntelligente/Transcriptions/AAAA-MM-JJ.md (local)."""
+    _, corps = lire_note(note)
+    texte = "\n".join(l for l in corps.splitlines() if not l.startswith("> ")).strip()
+    qui = f"{patient.patient} (créneau {patient.horaire or '?'})" if patient else "patient non identifié"
+    TRANSCRIPTIONS.mkdir(parents=True, exist_ok=True)
+    fichier = TRANSCRIPTIONS / f"{debut:%Y-%m-%d}.md"
+    neuf = not fichier.exists()
+    with fichier.open("a", encoding="utf-8") as f:
+        if neuf:
+            f.write(f"# Transcriptions des consultations du {debut:%d/%m/%Y}\n")
+        f.write(f"\n## {debut:%Hh%M} — {qui}\n\n{texte}\n")
+    log(f"Transcription ajoutée à {fichier.name}.")
+    return fichier
+
+
 # ------------------------------------------------- consultation → agenda
 def notifier(message: str) -> None:
     message = message.replace('"', "'")
@@ -298,6 +318,10 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
     noms = sorted({m for c in consultations for m in agenda.mots_du_nom(c.patient)}
                   | set(agenda.mots_du_nom(titre)), key=len, reverse=True)
     note = creer_note(brut, "cr", audio, noms)
+    try:
+        ajouter_transcription_du_jour(note, debut, patient)
+    except Exception as e:  # noqa: BLE001 — bonus : ne bloque jamais le CR
+        log(f"Transcription du jour non enregistrée ({e}).")
     sortie = rediger(note, noms, trame="consultation", contexte=contexte, premiere=premiere)
     if doc:
         dossier.marquer_utilise(DOSSIER, debut, doc)
@@ -358,15 +382,17 @@ def surveiller(intervalle: float) -> None:
                 except Exception as e:  # noqa: BLE001
                     echecs.add(audio)
                     log(f"ERREUR transcription {audio.name} : {e}")
-        if not relais.est_enregistreur():  # Mac mini : enregistrements envoyés par le MacBook
-            for wav, info in relais.a_traiter():
-                if wav in echecs:
-                    continue
-                try:
-                    relais.traiter(wav, info)
-                except Exception as e:  # noqa: BLE001
-                    echecs.add(wav)
-                    log(f"ERREUR relais {wav.name} : {e}")
+        # Mac mini : enregistrements envoyés par le MacBook. MacBook (enregistreur) : repli
+        # automatique s'ils ne sont pas pris en charge à temps (iCloud bloqué, Mac mini éteint).
+        delai = 0 if not relais.est_enregistreur() else relais.DELAI_REPLI
+        for wav, info in relais.a_traiter(anciennete_min=delai):
+            if wav in echecs:
+                continue
+            try:
+                relais.traiter(wav, info)
+            except Exception as e:  # noqa: BLE001
+                echecs.add(wav)
+                log(f"ERREUR relais {wav.name} : {e}")
         for note in fichiers_stables(VALIDE, {".md"}, tailles):
             if note in echecs:
                 continue
