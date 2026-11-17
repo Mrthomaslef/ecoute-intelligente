@@ -84,6 +84,18 @@ Les trames de rédaction se modifient dans `prompts/cr.md` et `prompts/rcp.md`.
 - Les noms de fichiers sont horodatés pour ne jamais reprendre le nom de l'audio.
 - Claude est appelé via `claude -p`, sans outils et sans historique de session. Variables d'environnement : `ECOUTE_MODELE` (par défaut `sonnet`), `ECOUTE_DOSSIER`, `ECOUTE_WHISPER`.
 
+## Après la RCP : Word, brouillons de mails et missions (automatique, Mac mini)
+
+**Avant la RCP**, déposer la liste préparatoire (« NOM Prénom IPP » en tête, puis les CR d'imagerie) dans **Drive › 1sceenshot et texte com › RCP JJ/MM**. À la fin du traitement de la RCP (MacBook, iPhone ou `ecoute rcp`), le Mac mini :
+
+1. lit cette liste, donne à chaque patient un repère (P1, P2…) et **anonymise localement** liste et transcription (noms, IPP, dates) avant l'envoi à Claude ;
+2. réinsère les identités sur le Mac, puis :
+   - **Word** « Synthèse RCP JJ-MM-AAAA.docx » dans `4_CR_Prets` et dans le dossier Drive de la RCP (jamais d'écrasement : un document existant garde son nom, le nouveau prend « (2) ») ;
+   - **brouillons dans la boîte AP-HP** (app Mail, dossier Brouillons, jamais envoyés), au format du service : objet « Mme NOM Prénom (née le …) — IPP … », « Pouvez-vous programmer pour … : » + liste, signature. Programmation → `rdv.radiob.cch` + équipe RI en copie ; consultation → secrétariat + Mariana/Gyslève ; correspondant extérieur → destinataire à compléter. Règles modifiables dans `~/EcouteIntelligente/destinataires_rcp.json` ;
+   - **missions** (gestes, consultations, examens qui reviennent à l'équipe de RI) dans l'Agenda RI › Questions perso › filtre **🧾 Missions RCP** (À faire / Fait).
+
+Sans liste préparatoire, tout est produit quand même avec « [PATIENT À COMPLÉTER] ». À la main : `ecoute rcp-suite transcription.txt --date 23/11/2026` (options `--sans-brouillons`, `--sans-agenda`, `--sans-drive`). Désactiver : `ECOUTE_SUITE_RCP=0`.
+
 ## RCP enregistrée sur l'iPhone (sans MacBook)
 
 1. App **Dictaphone** : enregistrer toute la RCP (fonctionne écran verrouillé ; iPhone posé près des orateurs, en mode Avion ou Ne pas déranger).

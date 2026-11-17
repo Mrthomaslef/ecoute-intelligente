@@ -472,6 +472,12 @@ def main() -> None:
     c.add_argument("--vitesse", type=float, default=1.0, help=argparse.SUPPRESS)
     rc = sp.add_parser("rcp", help="RCP : son nettoyé, transcription précise, synthèse par dossier")
     rc.add_argument("audios", type=Path, nargs="+", help="un ou plusieurs fichiers (recollés dans l'ordre)")
+    su = sp.add_parser("rcp-suite", help="Word, brouillons AP-HP et missions Agenda RI depuis une transcription de RCP")
+    su.add_argument("transcription", type=Path, help="fichier texte de la transcription (brute)")
+    su.add_argument("--date", required=True, help="date de la RCP (JJ/MM/AAAA)")
+    su.add_argument("--sans-brouillons", action="store_true")
+    su.add_argument("--sans-agenda", action="store_true")
+    su.add_argument("--sans-drive", action="store_true")
     sp.add_parser("micros", help="liste les micros disponibles")
     sp.add_parser("agenda", help="vérifie l'accès à l'Agenda RI et liste les consultations du jour")
     a = p.parse_args()
@@ -499,6 +505,11 @@ def main() -> None:
     elif a.cmd == "rcp":
         from .rcp import rcp_complet
         rcp_complet([f.expanduser().resolve() for f in a.audios])
+    elif a.cmd == "rcp-suite":
+        from .rcp_suite import suite_rcp
+        suite_rcp(a.transcription.expanduser().read_text(encoding="utf-8"),
+                  datetime.strptime(a.date, "%d/%m/%Y"), brouillons=not a.sans_brouillons,
+                  agenda_ri=not a.sans_agenda, drive=not a.sans_drive)
     elif a.cmd == "agenda":
         from . import agenda
         for c in agenda.consultations_du(datetime.now()):

@@ -94,7 +94,7 @@ def choisir(docs: list[Document], fin: datetime, deja_utilises: set[str]) -> Doc
     return max(candidats, key=lambda d: d.modifie, default=None)
 
 
-def lire(doc: Document) -> str:
+def lire(doc: Document, limite: int = LIMITE_TEXTE) -> str:
     exe = rclone()
     ext = Path(doc.nom).suffix.lower()
     with tempfile.TemporaryDirectory() as tmp:
@@ -116,7 +116,7 @@ def lire(doc: Document) -> str:
                            capture_output=True, timeout=60)
             texte = Path(str(local) + ".txt").read_text(encoding="utf-8", errors="replace")
     texte = re.sub(r"\n{3,}", "\n\n", texte).strip()
-    return texte[-LIMITE_TEXTE:] if len(texte) > LIMITE_TEXTE else texte
+    return texte[-limite:] if len(texte) > limite else texte
 
 
 # ----------------------------------------------- documents déjà utilisés

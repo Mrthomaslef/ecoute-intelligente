@@ -64,10 +64,29 @@ def envoyer(wav: Path, debut: datetime, fin: datetime, type_note: str) -> Path:
 
 
 # --------------------------------------------------------------- Mac mini
+SF_DATALESS = 0x40000000  # fichier iCloud dont le contenu n'est pas encore sur ce Mac
+
+
 def _telecharger(chemin: Path) -> None:
     """iCloud peut ne garder qu'un fichier fantôme (.nom.icloud) : on demande son téléchargement."""
     if not chemin.exists() and (chemin.parent / f".{chemin.name}.icloud").exists():
         subprocess.run(["brctl", "download", str(chemin)], capture_output=True)
+
+
+def present_localement(chemin: Path) -> bool:
+    """Vrai si le contenu du fichier est sur ce Mac. Sinon, demande son téléchargement à iCloud.
+
+    Un fichier « dataless » (coquille vide) ne peut pas être lu par la surveillance lancée en
+    arrière-plan (erreur « Resource deadlock avoided ») : on le fait télécharger par iCloud
+    (brctl) et on le reprend au passage suivant.
+    """
+    try:
+        if not getattr(chemin.stat(), "st_flags", 0) & SF_DATALESS:
+            return True
+    except OSError:
+        return False
+    subprocess.run(["brctl", "download", str(chemin)], capture_output=True)
+    return False
 
 
 DELAI_REPLI = 30 * 60  # s : au-delà, le MacBook traite lui-même ce que le Mac mini n'a pas pris (lent : dernier recours)
@@ -90,7 +109,7 @@ def a_traiter(anciennete_min: float = 0) -> list[tuple[Path, dict]]:
             continue
         wav = fiche.with_suffix("")  # x.m4a.json → x.m4a
         _telecharger(wav)
-        if not wav.exists():
+        if not wav.exists() or not present_localement(wav):
             continue
         st = wav.stat()
         taille = info.get("taille")
@@ -140,7 +159,7 @@ def depots_iphone(tailles: dict[Path, int], age_min: float = 60) -> list[Path]:
         subprocess.run(["brctl", "download", str(DEPOT_IPHONE / fantome.name[1:-len(".icloud")])],
                        capture_output=True)
     return [f for f in cli.fichiers_stables(DEPOT_IPHONE, cli.EXTENSIONS_AUDIO, tailles)
-            if time.time() - f.stat().st_mtime >= age_min]
+            if time.time() - f.stat().st_mtime >= age_min and present_localement(f)]
 
 
 def traiter_iphone(audio: Path) -> Path:

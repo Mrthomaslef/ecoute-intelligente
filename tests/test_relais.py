@@ -37,6 +37,16 @@ class TestRelais(unittest.TestCase):
             relais.depots_iphone(tailles)
             self.assertEqual(relais.depots_iphone(tailles), [a])
 
+    def test_fichier_icloud_non_telecharge(self):
+        f = self.tmp / "a.m4a"
+        f.write_bytes(b"x")
+        self.assertTrue(relais.present_localement(f))
+        faux = mock.Mock(st_flags=relais.SF_DATALESS)
+        with mock.patch.object(Path, "stat", return_value=faux), \
+             mock.patch.object(relais.subprocess, "run") as run:
+            self.assertFalse(relais.present_localement(f))
+            self.assertEqual(run.call_args[0][0][:2], ["brctl", "download"])
+
     def test_mode(self):
         self.assertFalse(relais.est_enregistreur())
         (self.tmp / ".mode").write_text("enregistreur\n")

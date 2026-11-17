@@ -11,6 +11,7 @@ Usage : ecoute rcp fichier1.wav [fichier2.wav …]
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -58,6 +59,14 @@ def rcp_complet(audios: list[Path], debut: datetime | None = None, ouvrir: bool 
             shutil.move(str(a), cli.chemin_libre(cli.TRAITES, f"{debut:%Y-%m-%d_%Hh%M}_rcp", a.suffix))
     cli.log(f"→ Synthèse de RCP : {sortie}")
     cli.notifier("Synthèse de la RCP prête (dossier par dossier).")
+    # Suite de RCP (Mac de traitement) : Word nominatif, brouillons AP-HP, missions dans l'Agenda RI.
+    from . import relais
+    if not relais.est_enregistreur() and os.environ.get("ECOUTE_SUITE_RCP", "1") != "0":
+        try:
+            from .rcp_suite import suite_rcp
+            suite_rcp(brut, debut)
+        except Exception as e:  # noqa: BLE001 — la synthèse .md reste disponible
+            cli.log(f"Suite de RCP impossible ({e}).")
     if ouvrir:
         subprocess.run(["open", "-t", str(sortie)], check=False)
     return sortie
