@@ -382,6 +382,15 @@ def surveiller(intervalle: float) -> None:
 
     initialiser()
     log(f"Surveillance de {DOSSIER} (Ctrl+C pour arrêter) — mode {relais.mode()}")
+    if not relais.est_enregistreur():
+        # Mac de traitement : ne doit jamais dormir, sinon les envois du MacBook attendent.
+        # (caffeinate -w s'arrête tout seul avec la surveillance ; l'écran peut, lui, s'éteindre.)
+        try:
+            subprocess.Popen(["/usr/bin/caffeinate", "-ims", "-w", str(os.getpid())],
+                             start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log("Mac de traitement : veille système empêchée tant que la surveillance tourne.")
+        except OSError as e:
+            log(f"Impossible d'empêcher la veille ({e}).")
     tailles: dict[Path, int] = {}
     echecs: set[Path] = set()
     while True:
