@@ -84,6 +84,15 @@ Les trames de rédaction se modifient dans `prompts/cr.md` et `prompts/rcp.md`.
 - Les noms de fichiers sont horodatés pour ne jamais reprendre le nom de l'audio.
 - Claude est appelé via `claude -p`, sans outils et sans historique de session. Variables d'environnement : `ECOUTE_MODELE` (par défaut `sonnet`), `ECOUTE_DOSSIER`, `ECOUTE_WHISPER`.
 
+## RCP enregistrée sur l'iPhone (sans MacBook)
+
+1. App **Dictaphone** : enregistrer toute la RCP (fonctionne écran verrouillé ; iPhone posé près des orateurs, en mode Avion ou Ne pas déranger).
+2. À la fin : ouvrir l'enregistrement › **⋯ › Enregistrer dans Fichiers › iCloud Drive › EcouteIntelligente › iPhone RCP**.
+3. Le Mac mini le récupère (≈ 1 min après l'arrivée dans iCloud), fait la même synthèse dossier par dossier → `4_CR_Prets`. L'audio quitte iCloud dès sa prise en charge.
+4. Supprimer l'enregistrement du Dictaphone (et de « Supprimés récemment »).
+
+Tout audio déposé dans ce dossier est traité comme une **RCP** : il n'est jamais déposé dans l'Agenda RI.
+
 ## RCP : réorganisation après coup
 
 En RCP, le micro du MacBook capte de loin : la transcription du direct est médiocre. À la fin de l'écoute 🟢 RCP (ou à la main : `ecoute rcp fichier1.wav [fichier2.wav…]`, plusieurs morceaux recollés dans l'ordre), le son est nettoyé et remonté (ffmpeg), retranscrit avec Whisper large-v3 complet, anonymisé localement, puis Claude **réorganise dossier par dossier** (question, synthèse, décision, geste, examens, hémostase, suivi), liste les passages non compris, les actions et les brouillons de mails → `4_CR_Prets`. Pour une meilleure prise de son : micro de table ou micro de l'iPhone (`ecoute micros`).

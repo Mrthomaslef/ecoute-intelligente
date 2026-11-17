@@ -426,6 +426,16 @@ def surveiller(intervalle: float) -> None:
             except Exception as e:  # noqa: BLE001
                 echecs.add(wav)
                 log(f"ERREUR relais {wav.name} : {e}")
+        if not relais.est_enregistreur():  # RCP enregistrées sur l'iPhone (Dictaphone → iCloud)
+            relais.DEPOT_IPHONE.mkdir(parents=True, exist_ok=True)
+            for audio in relais.depots_iphone(tailles):
+                if audio in echecs:
+                    continue
+                try:
+                    relais.traiter_iphone(audio)
+                except Exception as e:  # noqa: BLE001
+                    echecs.add(audio)
+                    log(f"ERREUR RCP iPhone {audio.name} : {e}")
         for note in fichiers_stables(VALIDE, {".md"}, tailles):
             if note in echecs:
                 continue

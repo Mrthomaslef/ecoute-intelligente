@@ -26,6 +26,10 @@ RELAIS = Path(os.environ.get(
     Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/EcouteIntelligente/Relais",
 ))
 
+# iPhone (app Dictaphone) : « Enregistrer dans Fichiers » › iCloud Drive › EcouteIntelligente › iPhone RCP.
+# Tout audio déposé ici est traité comme une RCP (jamais déposé dans l'Agenda RI).
+DEPOT_IPHONE = Path(os.environ.get("ECOUTE_DEPOT_IPHONE", RELAIS.parent / "iPhone RCP"))
+
 
 def mode() -> str:
     try:
@@ -124,6 +128,28 @@ def traiter(wav: Path, info: dict) -> Path | None:
     if wav.exists():
         shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
     fiche.unlink(missing_ok=True)
+    return sortie
+
+
+# ------------------------------------------------------------ iPhone
+def depots_iphone(tailles: dict[Path, int], age_min: float = 60) -> list[Path]:
+    """Audios déposés depuis l'iPhone, arrivés en entier (taille stable et âgés d'au moins age_min s)."""
+    if not DEPOT_IPHONE.exists():
+        return []
+    for fantome in DEPOT_IPHONE.glob(".*.icloud"):  # pas encore téléchargé depuis iCloud
+        subprocess.run(["brctl", "download", str(DEPOT_IPHONE / fantome.name[1:-len(".icloud")])],
+                       capture_output=True)
+    return [f for f in cli.fichiers_stables(DEPOT_IPHONE, cli.EXTENSIONS_AUDIO, tailles)
+            if time.time() - f.stat().st_mtime >= age_min]
+
+
+def traiter_iphone(audio: Path) -> Path:
+    """RCP enregistrée sur l'iPhone : même traitement que la RCP du MacBook (synthèse par dossier)."""
+    from .rcp import rcp_complet
+    cli.log(f"iPhone : RCP reçue ({audio.stat().st_size // 1_000_000} Mo).")
+    sortie = rcp_complet([audio], datetime.fromtimestamp(audio.stat().st_mtime), ouvrir=False)
+    if audio.exists():  # l'audio quitte iCloud dès qu'il est traité
+        shutil.move(str(audio), cli.chemin_libre(cli.TRAITES, audio.stem, audio.suffix.lower()))
     return sortie
 
 

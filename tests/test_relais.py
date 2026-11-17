@@ -22,6 +22,21 @@ class TestRelais(unittest.TestCase):
         for p in self.p:
             p.stop()
 
+    def test_depot_iphone(self):
+        import os, time
+        with mock.patch.object(relais, "DEPOT_IPHONE", self.tmp / "iphone"):
+            relais.DEPOT_IPHONE.mkdir()
+            a = relais.DEPOT_IPHONE / "Nouvel enregistrement 3.m4a"
+            a.write_bytes(b"\0" * 500)
+            (relais.DEPOT_IPHONE / "notes.txt").write_text("x")
+            tailles = {}
+            self.assertEqual(relais.depots_iphone(tailles), [])  # 1er passage : taille notée
+            self.assertEqual(relais.depots_iphone(tailles), [])  # trop récent (copie peut-être en cours)
+            vieux = time.time() - 120
+            os.utime(a, (vieux, vieux))
+            relais.depots_iphone(tailles)
+            self.assertEqual(relais.depots_iphone(tailles), [a])
+
     def test_mode(self):
         self.assertFalse(relais.est_enregistreur())
         (self.tmp / ".mode").write_text("enregistreur\n")
