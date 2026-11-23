@@ -12,6 +12,7 @@ dans le CR après rédaction, puis envoyée à l'agenda (qui la contient déjà)
 from __future__ import annotations
 
 import json
+import time
 import os
 import re
 import subprocess
@@ -105,12 +106,20 @@ class ApiSecurisee(Exception):
 def poster(charge: dict) -> dict:
     url, jeton = _identifiants()
     corps = json.dumps({**charge, "token": jeton}, ensure_ascii=False)
-    r = subprocess.run(
-        ["curl", "-4", "-sL", "--retry", "2", "--max-time", "90",
-         "-H", "Content-Type: text/plain;charset=utf-8", "-d", "@-", url],
-        input=corps.encode("utf-8"), capture_output=True, check=True,
-    )
-    rep = json.loads(r.stdout.decode("utf-8"))
+    rep = None
+    for essai in range(6):  # serveur Google occupé (verrou) : page d'erreur HTML au lieu de JSON → on réessaie
+        r = subprocess.run(
+            ["curl", "-4", "-sL", "--retry", "2", "--max-time", "90",
+             "-H", "Content-Type: text/plain;charset=utf-8", "-d", "@-", url],
+            input=corps.encode("utf-8"), capture_output=True, check=True,
+        )
+        try:
+            rep = json.loads(r.stdout.decode("utf-8"))
+            break
+        except ValueError:
+            time.sleep(10 + 10 * essai)
+    if rep is None:
+        raise RuntimeError("agenda occupé (verrou Google) après plusieurs essais")
     if rep.get("status") == "unauthorized":
         subprocess.run(["security", "delete-generic-password", "-s", TROUSSEAU], capture_output=True)
         raise RuntimeError("code d'accès de l'agenda refusé (il sera redemandé)")
