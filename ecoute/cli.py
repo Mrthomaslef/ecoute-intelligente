@@ -299,7 +299,8 @@ def notifier(message: str) -> None:
 
 
 def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
-                             fin: datetime | None = None, poste_local: bool = True) -> Path:
+                             fin: datetime | None = None, poste_local: bool = True,
+                             remplacer: bool = False) -> Path:
     """Tout automatique : anonymisation → Claude → CR déposé dans la fiche patient de l'agenda."""
     from . import agenda
 
@@ -352,7 +353,7 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
             subprocess.run(["open", "-t", str(pret)], check=False)
         return sortie
     try:
-        agenda.deposer(patient, agenda.reidentifier(cr, patient, ddn=ddn, fem=fem))
+        agenda.deposer(patient, agenda.reidentifier(cr, patient, ddn=ddn, fem=fem), remplacer=remplacer)
     except Exception as e:  # noqa: BLE001
         log(f"Dépôt dans l'agenda impossible ({e}).")
         notifier("CR prêt et copié (⌘V). Dépôt dans l'agenda impossible.")

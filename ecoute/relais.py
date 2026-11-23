@@ -33,6 +33,7 @@ DRIVE_RELAIS = os.environ.get("ECOUTE_DRIVE_RELAIS", "gdrive:01 - Cochin (en cou
 INTERVALLE_DRIVE = 30  # s entre deux consultations du dossier Drive (Mac mini)
 ATTENTE_NOTE = 3 * 60   # s : on attend une éventuelle note dictée juste après la consultation avant de rédiger
 ECART_NOTE = 10 * 60    # s : une note commence moins de 10 min après la fin de la consultation…
+ECART_NOTE_TARDIVE = 30 * 60  # s : note arrivée après le CR → le CR est refait et remplacé si < 30 min
 DUREE_MAX_NOTE = 3 * 60  # s : … et dure au plus 3 min (au-delà, c'est une autre consultation)
 _dernier_drive = [0.0]
 
@@ -322,10 +323,62 @@ def grouper(prets: list[tuple[Path, dict]]) -> list[list[tuple[Path, dict]]]:
     return groupes
 
 
-def traiter_groupe(groupe: list[tuple[Path, dict]]) -> Path | None:
+def _historique() -> Path:
+    return cli.DOSSIER / ".relais_historique.json"
+
+
+def historique() -> list[dict]:
+    try:
+        return json.loads(_historique().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def archiver_consultation(groupe: list[tuple[Path, dict]]) -> None:
+    """Garde une copie des audios d'une consultation traitée (pour la refaire si une note arrive après)."""
+    dossier = cli.AUDIO / "_consultations"
+    dossier.mkdir(parents=True, exist_ok=True)
+    copies = []
+    for wav, info in groupe:
+        if wav.exists():
+            cible = cli.chemin_libre(dossier, wav.stem, wav.suffix)
+            shutil.copy2(wav, cible)
+            copies.append({"audio": str(cible), "info": info})
+    if copies:
+        h = historique() + [{"debut": groupe[0][1]["debut"],
+                             "fin": groupe[-1][1].get("fin") or groupe[-1][1]["debut"], "items": copies}]
+        _historique().write_text(json.dumps(h[-60:], ensure_ascii=False), encoding="utf-8")
+
+
+def consultation_precedente(note_info: dict) -> list[tuple[Path, dict]] | None:
+    """Pour une note courte isolée : la consultation déjà traitée qu'elle complète (< 30 min avant), sinon None."""
+    debut = datetime.fromisoformat(note_info["debut"])
+    fin = datetime.fromisoformat(note_info.get("fin") or note_info["debut"])
+    if note_info.get("type", "cr") != "cr" or (fin - debut).total_seconds() > DUREE_MAX_NOTE:
+        return None
+    meilleure = None
+    for h in historique():
+        ecart = (debut - datetime.fromisoformat(h["fin"])).total_seconds()
+        if 0 <= ecart <= ECART_NOTE_TARDIVE and (meilleure is None or h["fin"] > meilleure["fin"]):
+            meilleure = h
+    if not meilleure:
+        return None
+    items = [(Path(i["audio"]), i["info"]) for i in meilleure["items"] if Path(i["audio"]).exists()]
+    return items or None
+
+
+def traiter_groupe(groupe: list[tuple[Path, dict]], remplacer: bool = False) -> Path | None:
     """Une consultation suivie de notes dictées : une seule transcription, un seul CR."""
     if len(groupe) == 1:
+        precedente = consultation_precedente(groupe[0][1])
+        if precedente:  # note dictée APRÈS le CR : on refait le CR complet et on remplace l'ancien
+            cli.log("Relais : note dictée arrivée après le CR de la consultation précédente : CR refait et remplacé.")
+            return traiter_groupe(precedente + groupe, remplacer=True)
+        if groupe[0][1].get("type", "cr") == "cr":
+            archiver_consultation(groupe)
         return traiter(*groupe[0])
+    if not remplacer:
+        archiver_consultation(groupe)
     premier, info0 = groupe[0]
     debut = datetime.fromisoformat(info0["debut"])
     fin = datetime.fromisoformat(groupe[-1][1].get("fin") or groupe[-1][1]["debut"])
@@ -340,9 +393,12 @@ def traiter_groupe(groupe: list[tuple[Path, dict]]) -> Path | None:
             parties.append("--- NOTE DICTÉE PAR LE MÉDECIN APRÈS LA CONSULTATION (prioritaire pour la synthèse, "
                            "la décision et la conduite à tenir) ---\n" + texte)
     brut = "\n\n".join(p for p in parties if p)
-    sortie = cli.consultation_vers_agenda(brut, premier, debut, fin=fin, poste_local=False) if brut.strip() else None
+    # En remplacement, l'audio de la consultation est une copie d'archive : on ne la déplace pas.
+    sortie = (cli.consultation_vers_agenda(brut, None if remplacer else premier, debut, fin=fin,
+                                           poste_local=False, remplacer=remplacer)
+              if brut.strip() else None)
     for wav, _ in groupe:
-        if wav.exists():
+        if wav.exists() and wav.parent.resolve() == RELAIS.resolve():
             shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
         (RELAIS / f"{wav.name}.json").unlink(missing_ok=True)
     return sortie

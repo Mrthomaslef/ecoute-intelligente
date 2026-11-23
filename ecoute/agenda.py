@@ -188,7 +188,8 @@ def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str)
     candidats = cites or miennes
     t = debut.hour * 60 + debut.minute
     proches = sorted(
-        (abs(c.minutes() - t), c) for c in candidats if c.minutes() is not None
+        ((abs(c.minutes() - t), c) for c in candidats if c.minutes() is not None),
+        key=lambda x: x[0],  # égalité de créneaux : ne jamais comparer deux Consultation entre elles
     )
     if proches and proches[0][0] <= FENETRE_MIN:
         return proches[0][1]
@@ -196,17 +197,18 @@ def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str)
 
 
 # ------------------------------------------------------------- écriture
-def deposer(c: Consultation, cr: str, essai: bool = False) -> str:
-    """Ajoute le CR à la fiche (sans effacer l'existant). Renvoie la clé de fiche."""
+def deposer(c: Consultation, cr: str, essai: bool = False, remplacer: bool = False) -> str:
+    """Ajoute le CR à la fiche (sans effacer les notes saisies). remplacer=True : le nouveau CR
+    remplace le(s) CR dicté(s) déjà déposé(s) (ex. note dictée arrivée après coup). Renvoie la clé."""
     entete = f"— CR de consultation dicté le {datetime.now():%d/%m/%Y à %Hh%M} —"
     cle = f"{c.iso}_{norm_nom(c.patient)}_cs"
     try:
-        return _deposer_eval(c, cle, entete, cr, essai)
+        return _deposer_eval(c, cle, entete, cr, essai, remplacer)
     except ApiSecurisee:
-        return _deposer_api(c, cle, entete, cr, essai)
+        return _deposer_api(c, cle, entete, cr, essai, remplacer)
 
 
-def _deposer_api(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -> str:
+def _deposer_api(c: Consultation, cle: str, entete: str, cr: str, essai: bool, remplacer: bool = False) -> str:
     """Via l'action « save_suivi » : on reprend les champs existants du patient, car
     cette action réécrit aussi matériel / remarques / anapath de ses lignes Biopsies et actes."""
     d = lire_tout()
@@ -222,6 +224,8 @@ def _deposer_api(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -
                 ent.setdefault("remarques", r.get("Remarques (Bloc)") or r.get("Remarques & Suivi", ""))
                 ent.setdefault("anapath", r.get("Anatomopathologie", ""))
     avant = ent.get("suivi_cs") or ligne.get("Remarques de suivi", "")
+    if remplacer:
+        avant = avant.split("— CR de consultation dicté")[0].strip()
     texte = (avant + "\n\n" if avant else "") + entete + "\n" + cr.strip()
     if len(texte) > 5000:
         texte = (entete + "\n" + cr.strip())[:5000]
@@ -237,7 +241,7 @@ def _deposer_api(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -
     return cle
 
 
-def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool) -> str:
+def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool, remplacer: bool = False) -> str:
     resultat = executer(f"""
       var row = {c.row}, pat = {json.dumps(c.patient)}, cle = {json.dumps(cle)};
       var bloc = {json.dumps(entete + chr(10) + cr.strip())};
@@ -249,6 +253,7 @@ def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool) 
       var ent = cur[cle] || {{ suivi_key: cle, row: row, patient_name: pat, ipp: '', iso_date: {json.dumps(c.iso)},
                               category: 'cs', title: {json.dumps(c.titre)}, materiel: '', remarques: '', anapath: '' }};
       var avant = ent.suivi_cs || sh.getRange(row, 11).getDisplayValue() || '';
+      if ({'true' if remplacer else 'false'}) avant = avant.split('— CR de consultation dicté')[0].trim();
       var texte = (avant ? avant + '\\n\\n' : '') + bloc;
       if (texte.length > 5000) texte = bloc.slice(0, 5000);
       if ({'true' if essai else 'false'}) return {{ ok: true, essai: true, longueur: texte.length, avant: avant.length }};

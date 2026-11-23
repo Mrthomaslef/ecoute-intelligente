@@ -202,3 +202,24 @@ class TestNoteVsConsultationSuivante(unittest.TestCase):
         suivante = (Path("c.m4a"), {"debut": "2026-11-23T09:38:29", "fin": "2026-11-23T09:51:34", "type": "cr"})
         g = relais.grouper([cons, note, suivante])
         self.assertEqual([[p[0].name for p in x] for x in g], [["a.m4a", "b.m4a"], ["c.m4a"]])
+
+
+class TestNoteTardive(unittest.TestCase):
+    def test_note_apres_le_cr_retrouve_sa_consultation(self):
+        import json, tempfile
+        from pathlib import Path
+        from unittest import mock
+        from ecoute import cli, relais
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            with mock.patch.object(cli, "DOSSIER", d), mock.patch.object(cli, "AUDIO", d / "1_Audio"):
+                a = d / "c.m4a"; a.write_bytes(b"x")
+                relais.archiver_consultation([(a, {"debut": "2026-11-23T09:38:29", "fin": "2026-11-23T09:51:34", "type": "cr"})])
+                note = {"debut": "2026-11-23T10:05:48", "fin": "2026-11-23T10:06:30", "type": "cr"}
+                prec = relais.consultation_precedente(note)
+                self.assertIsNotNone(prec)
+                self.assertEqual(len(prec), 1)
+                longue = {"debut": "2026-11-23T10:05:48", "fin": "2026-11-23T10:20:00", "type": "cr"}
+                self.assertIsNone(relais.consultation_precedente(longue))  # 14 min : nouvelle consultation
+                tard = {"debut": "2026-11-23T11:00:00", "fin": "2026-11-23T11:00:40", "type": "cr"}
+                self.assertIsNone(relais.consultation_precedente(tard))  # > 30 min : pas rattachée
