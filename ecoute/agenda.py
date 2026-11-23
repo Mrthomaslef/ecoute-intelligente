@@ -256,7 +256,44 @@ def _deposer_eval(c: Consultation, cle: str, entete: str, cr: str, essai: bool) 
     return cle
 
 
-def reidentifier(cr: str, c: Consultation, tronquer: bool = True) -> str:
-    """Remet localement l'identité du patient à la place de la balise [PATIENT]."""
-    cr = cr.replace("[PATIENT]", c.patient)
+def nom_civil(patient: str, fem: bool | None = None) -> str:
+    """« Mme SUPA KANZI Julienne » → « Madame Julienne SUPA KANZI » (prénom puis NOM, civilité en toutes lettres)."""
+    mots = re.sub(r"\(.*?\)", " ", patient).split()
+    civ = None
+    if mots and norm(mots[0]).rstrip(".") in {"mme", "mlle", "madame"}:
+        civ, mots = "Madame", mots[1:]
+    elif mots and norm(mots[0]).rstrip(".") in {"m", "mr", "monsieur"}:
+        civ, mots = "Monsieur", mots[1:]
+    if civ is None and fem is not None:
+        civ = "Madame" if fem else "Monsieur"
+    nom = [m for m in mots if m.isupper() or "-" in m and m.replace("-", "").isupper()]
+    prenom = [m for m in mots if m not in nom]
+    texte = " ".join(prenom + nom) if prenom and nom else " ".join(mots)
+    return f"{civ} {texte}" if civ else texte
+
+
+def infos_patient(c: Consultation) -> tuple[str | None, bool | None]:
+    """(date de naissance, féminin ?) d'après l'onglet Data de l'agenda ; (None, None) si introuvable."""
+    try:
+        cible = norm_nom(c.patient)
+        for r in lire_tout().get("Data", []):
+            n = norm_nom(str(r.get("Identité Patient", "")))
+            if n and (n in cible or cible in n):
+                coord = str(r.get("Coordonnées / DDN", ""))
+                m = re.search(r"\bN[ée]e?\s+le\s+(\d{2}/\d{2}/\d{4})", coord)
+                fem = True if re.search(r"\bNée\b", coord) or norm(str(r.get("Identité Patient", ""))).startswith("mme") \
+                    else (False if m else None)
+                return (m.group(1) if m else None), fem
+    except Exception:  # noqa: BLE001 — l'agenda est un bonus
+        pass
+    return None, None
+
+
+def reidentifier(cr: str, c: Consultation, tronquer: bool = True, ddn: str | None = None,
+                 fem: bool | None = None) -> str:
+    """Remet localement l'identité du patient : civilité + Prénom NOM, et date de naissance si connue."""
+    cr = cr.replace("[PATIENT]", nom_civil(c.patient, fem))
+    if ddn:
+        cr = re.sub(r"(n[ée]e? le )\[DATE\]", lambda m: m.group(1) + ddn, cr, count=1)
+    cr = re.sub(r"\s*\(n[ée]e? le \[DATE\]\)", "", cr)  # date de naissance inconnue : on n'écrit pas la balise
     return cr if not tronquer or len(cr) <= LIMITE_CHAMP else cr[:LIMITE_CHAMP].rsplit("\n", 1)[0] + "\n[…] (CR complet dans 4_CR_Prets)"

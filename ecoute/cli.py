@@ -338,7 +338,8 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
     if doc:
         dossier.marquer_utilise(DOSSIER, debut, doc)
     _, cr = lire_note(sortie)
-    final = agenda.reidentifier(cr, patient, tronquer=False) if patient else cr
+    ddn, fem = agenda.infos_patient(patient) if patient else (None, None)
+    final = agenda.reidentifier(cr, patient, tronquer=False, ddn=ddn, fem=fem) if patient else cr
     pret = chemin_libre(PRETS, f"{sortie.stem}_a_copier", ".txt")
     pret.write_text(final.strip() + "\n", encoding="utf-8")
     if poste_local:  # consultation traitée sur le Mac utilisé : CR prêt à coller
@@ -351,7 +352,7 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
             subprocess.run(["open", "-t", str(pret)], check=False)
         return sortie
     try:
-        agenda.deposer(patient, agenda.reidentifier(cr, patient))
+        agenda.deposer(patient, agenda.reidentifier(cr, patient, ddn=ddn, fem=fem))
     except Exception as e:  # noqa: BLE001
         log(f"Dépôt dans l'agenda impossible ({e}).")
         notifier("CR prêt et copié (⌘V). Dépôt dans l'agenda impossible.")

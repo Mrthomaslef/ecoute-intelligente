@@ -34,7 +34,7 @@ class TestAgenda(unittest.TestCase):
         self.assertEqual(mots_du_nom("Mme DUPONTEL Claire (née MARTIN)"), ["DUPONTEL", "Claire"])
 
     def test_reidentification_locale(self):
-        self.assertEqual(reidentifier("J'ai reçu [PATIENT].", JOUR[0]), "J'ai reçu Mme DUPONTEL Claire.")
+        self.assertEqual(reidentifier("J'ai reçu [PATIENT].", JOUR[0]), "J'ai reçu Madame Claire DUPONTEL.")
 
 
 if __name__ == "__main__":
@@ -80,3 +80,15 @@ class TestApiSecurisee(unittest.TestCase):
         self.assertTrue(ent["suivi_cs"].startswith("ancien\n\n— CR de consultation dicté"))
         self.assertTrue(ent["suivi_cs"].endswith("Nouveau CR"))
         self.assertEqual(ent["suivi_key"], "2026-11-09_kervarechyann_cs")
+
+
+class TestReidentifier(unittest.TestCase):
+    def test_civilite_prenom_nom_et_ddn(self):
+        from ecoute.agenda import Consultation, nom_civil, reidentifier
+        self.assertEqual(nom_civil("Mme SUPA KANZI Julienne"), "Madame Julienne SUPA KANZI")
+        self.assertEqual(nom_civil("COEUILLE Frederic", fem=False), "Monsieur Frederic COEUILLE")
+        c = Consultation(1, "23/11/2026", "08h50", "Mme SUPA KANZI Julienne", "TL", "Télécs")
+        cr = "J'ai revu ce jour [PATIENT], âgée de 64 ans (née le [DATE]), un mois après."
+        self.assertEqual(reidentifier(cr, c, ddn="05/05/1962"),
+                         "J'ai revu ce jour Madame Julienne SUPA KANZI, âgée de 64 ans (née le 05/05/1962), un mois après.")
+        self.assertEqual(reidentifier(cr, c), "J'ai revu ce jour Madame Julienne SUPA KANZI, âgée de 64 ans, un mois après.")
