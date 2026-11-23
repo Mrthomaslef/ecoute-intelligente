@@ -364,6 +364,8 @@ def creer_brouillon(mail: dict) -> None:
 
 # Synthèse Word de la RCP : brouillon (jamais envoyé) depuis le mail AP-HP, Word en pièce jointe.
 WORD_A = ["marie.talabard@aphp.fr"]  # Dr Marie-Pauline Talabard
+# Thomas (23/11/2026) : un SEUL brouillon après la RCP, celui de Marie-Pauline. Pas de brouillons secrétariat.
+BROUILLONS_SECRETARIAT = False
 
 SCRIPT_BROUILLON_PJ = r'''
 on run argv
@@ -382,10 +384,23 @@ end run
 '''
 
 
-def brouillon_word(word: Path, jour: datetime, a: list[str] = WORD_A) -> None:
-    """Brouillon « Synthèse RCP JJ/MM » adressé à Marie-Pauline avec le Word joint (Thomas relit et envoie)."""
-    corps = (f"Bonjour Marie-Pauline,\n\nCi-joint la synthèse de la RCP du {jour:%d/%m/%Y}.\n\n"
-             "Bien amicalement,\nThomas")
+def synthese_courte(data: dict, patients: list, jour: datetime) -> str:
+    """Corps du mail : un bloc de 2 lignes par dossier (🎯 = geste pour l'équipe de RI)."""
+    lignes = [f"Bonjour Marie-Pauline,", "", f"Synthèse de la RCP du {jour:%d/%m/%Y} :", ""]
+    for i, d in enumerate(data.get("dossiers", []), 1):
+        p = _patient(d, patients)
+        cible = "🎯 " if str(d.get("geste_ri", "")).lower().startswith("oui") else ""
+        titre = (p.identite() + " — " if p else "") + reidentifier(str(d.get("titre_court") or d.get("age_sexe") or ""), patients)
+        court = reidentifier(str(d.get("court") or d.get("decision") or ""), patients)
+        lignes += [f"{i}. {cible}{titre}", f"→ {court}", ""]
+    lignes += ["Détail dans le Word ci-joint.", "", "Bien amicalement,", "Thomas"]
+    return "\n".join(lignes)
+
+
+def brouillon_word(word: Path, jour: datetime, a: list[str] = WORD_A, corps: str | None = None) -> None:
+    """Brouillon « Synthèse RCP JJ/MM » adressé à Marie-Pauline : synthèse courte + Word joint (Thomas relit et envoie)."""
+    corps = corps or (f"Bonjour Marie-Pauline,\n\nCi-joint la synthèse de la RCP du {jour:%d/%m/%Y}.\n\n"
+                      "Bien amicalement,\nThomas")
     for dest in a:
         r = subprocess.run(["osascript", "-", f"Synthèse RCP du {jour:%d/%m/%Y}", corps, MOI, dest, str(word)],
                            input=SCRIPT_BROUILLON_PJ, capture_output=True, text=True, timeout=120)
@@ -486,7 +501,7 @@ def suite_rcp(brut: str, jour: datetime, brouillons: bool = True, agenda_ri: boo
         bilan["word"] = str(base)
         if brouillons:
             try:
-                brouillon_word(base, jour)
+                brouillon_word(base, jour, corps=synthese_courte(data, patients, jour))
                 cli.log(f"RCP : brouillon (Word joint) préparé pour {', '.join(WORD_A)} — à envoyer par le Dr Lefevre.")
             except Exception as e:  # noqa: BLE001
                 cli.log(f"RCP : brouillon Word non créé ({e}).")
@@ -500,7 +515,7 @@ def suite_rcp(brut: str, jour: datetime, brouillons: bool = True, agenda_ri: boo
     (cli.PRETS / f"{base.stem}_mails.json").write_text(json.dumps(mails, ensure_ascii=False, indent=1),
                                                        encoding="utf-8")
     n = 0
-    if brouillons:
+    if brouillons and BROUILLONS_SECRETARIAT:
         for m in mails:
             try:
                 creer_brouillon(m)

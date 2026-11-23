@@ -19,7 +19,9 @@ TA TÂCHE : produire UNIQUEMENT un objet JSON valide (aucun texte autour, pas de
       "decision": "Décision retenue, telle que formulée en RCP.",
       "geste_ri": "Oui — électrochimiothérapie de la lame droite (équipe RI Cochin)" ou "Non",
       "suite": "Ce qui reste à programmer ou à faire.",
-      "incertain": "Ce qui est ambigu dans l'enregistrement, ou chaîne vide"
+      "incertain": "Ce qui est ambigu dans l'enregistrement, ou chaîne vide",
+      "titre_court": "Femme 96 ans, métastase T10-T12 (sein)",
+      "court": "Électrochimiothérapie T10-T12 retenue → CS pré-geste à programmer rapidement."
     }
   ],
   "missions": [
@@ -36,6 +38,7 @@ TA TÂCHE : produire UNIQUEMENT un objet JSON valide (aucun texte autour, pas de
 }
 
 RÈGLES :
+- "titre_court" (≤ 10 mots : sexe, âge, pathologie, localisation) et "court" (UNE phrase de ≤ 25 mots : décision → suite, style télégraphique clair) servent au mail de synthèse à la collègue de RI : ce qu'on retient en 5 secondes.
 - "dossiers" : un élément par dossier discuté, dans l'ordre de passage. "patient" = le repère de la liste préparatoire qui correspond (âge, pathologie, localisation, nom prononcé) ; null si tu ne peux pas le rattacher avec une bonne certitude. Si un patient de la liste n'a pas été discuté, ne l'invente pas.
 - "missions" : UNIQUEMENT ce qui revient au Dr Lefevre ou à l'équipe de radiologie interventionnelle de Cochin (gestes à programmer, consultations pré-geste, examens d'imagerie à demander, avis à rendre, patient à rappeler). Pas les tâches des oncologues, chirurgiens ou radiothérapeutes. Phrases d'action courtes, à l'infinitif.
 - "mails" : un brouillon pour chaque action qui demande d'écrire à quelqu'un, en reprenant EXACTEMENT le style des mails du Dr Lefevre :
