@@ -121,3 +121,14 @@ class TestNomMalOrthographie(unittest.TestCase):
         self.assertEqual(choisir(cs, datetime(2026, 11, 23, 11, 23), texte).row, 50)
         texte2 = "Je complète pour madame, ostéome ostéoïde du col fémoral, radiofréquence, consultation d'anesthésie, je lui ai expliqué les risques et le traitement"
         self.assertEqual(choisir(cs, datetime(2026, 11, 23, 11, 23), texte2).row, 50)
+
+
+class TestDateCitee(unittest.TestCase):
+    def test_fin_de_consultation_reconnue_par_la_date(self):
+        """23/11 : fin de la CS Lafont (11h17, « j'ai le 5 janvier 7h30 ») rangée chez Chemla (11h30)."""
+        from datetime import datetime
+        from ecoute.agenda import Consultation, choisir
+        cs = [Consultation(50, "23/11/2026", "10h30", "Mme LAFONT Estelle", "Dr LEFEVRE Thomas", "CS pré-interventionnelle (RF ostéome ostéoïde col fémoral G)", "CS anesth 15/12 · RF sous AG 05/01/2027"),
+              Consultation(53, "23/11/2026", "11h30", "Mme CHEMLA Toscane", "Dr LEFEVRE Thomas", "CS pré-op (cryo récidive TCG tibia proximal / genou)", "CS anesth 14h00. Cryo 01/12 08h30.")]
+        texte = "ça dure combien de temps l'opération, la prescription je vous l'envoie par mail, j'ai le 5 janvier 7h30"
+        self.assertEqual(choisir(cs, datetime(2026, 11, 23, 11, 17), texte, {"lafontestelle"}).row, 50)

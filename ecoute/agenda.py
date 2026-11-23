@@ -187,10 +187,23 @@ def _racines(texte: str) -> set[str]:
     return {m[:6] for m in re.findall(r"[a-z]{4,}", norm(texte)) if m not in _MOTS_VIDES}
 
 
+_MOIS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre",
+         "novembre", "decembre"]
+
+
+def _dates_dites(texte: str) -> set[str]:
+    """« le 5 janvier », « 15 décembre » → {"05/01", "15/12"}."""
+    t = norm(texte)
+    return {f"{int(j):02d}/{_MOIS.index(m) + 1:02d}"
+            for j, m in re.findall(r"\b(\d{1,2})(?:er)?\s+(" + "|".join(_MOIS) + r")\b", t) if 1 <= int(j) <= 31}
+
+
 def score_contenu(c: Consultation, texte_brut: str) -> int:
-    """Nombre de mots du motif / des remarques de l'agenda retrouvés dans la transcription (zona, intercostal…)."""
+    """Mots du motif / des remarques de l'agenda retrouvés dans la transcription (zona, intercostal…),
+    + 3 par date de RDV de la fiche citée à voix haute (« le 5 janvier » ↔ 05/01/2027)."""
     motif = _racines(f"{c.titre} {c.remarques}") - _racines(c.patient)
-    return len(motif & _racines(texte_brut))
+    dates = {d[:5] for d in re.findall(r"\b\d{2}/\d{2}", f"{c.titre} {c.remarques}")}
+    return len(motif & _racines(texte_brut)) + 3 * len(dates & _dates_dites(texte_brut))
 
 
 def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str,
@@ -207,11 +220,13 @@ def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str,
              if any(f" {simple(norm(m))} " in texte for m in mots_du_nom(c.patient) if len(m) >= 4)]
     if len(cites) == 1:
         return cites[0]
-    candidats = cites or ([c for c in miennes if norm_nom(c.patient) not in deja_faits] or miennes)
-    # 2. Contenu : motif de la consultation retrouvé dans la transcription (patient arrivé en avance/retard)
-    scores = sorted(((score_contenu(c, texte_brut), i) for i, c in enumerate(candidats)), reverse=True)
+    # 2. Contenu : motif / dates de RDV retrouvés dans la transcription (patient en avance/retard, fin d'un
+    #    enregistrement coupé) — y compris les patients déjà faits : un enregistrement peut être en plusieurs morceaux.
+    pool = cites or miennes
+    scores = sorted(((score_contenu(c, texte_brut), i) for i, c in enumerate(pool)), reverse=True)
     if scores and scores[0][0] >= 2 and (len(scores) == 1 or scores[0][0] > scores[1][0]):
-        return candidats[scores[0][1]]
+        return pool[scores[0][1]]
+    candidats = cites or ([c for c in miennes if norm_nom(c.patient) not in deja_faits] or miennes)
     # 3. Créneau horaire le plus proche du début de l'enregistrement
     t = debut.hour * 60 + debut.minute
     proches = sorted(
