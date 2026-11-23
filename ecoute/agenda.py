@@ -178,7 +178,9 @@ def _consultations_eval(date: str) -> list[Consultation]:
 # ------------------------------------------------------------ appariement
 _MOTS_VIDES = {"consultation", "teleconsultation", "specialisee", "suivi", "pour", "avec", "sous", "dans", "voir",
                "mail", "post", "apporter", "date", "prevue", "prevu", "visio", "distance", "radio", "patient",
-               "patiente", "douleur", "douleurs", "droit", "droite", "gauche", "jour", "mois", "fait", "faire"}
+               "patiente", "douleur", "douleurs", "droit", "droite", "gauche", "jour", "mois", "fait", "faire",
+               "traitement", "risque", "risques", "expliquer", "explique", "evaluer", "evaluation", "reevaluation",
+               "intervention", "interventionnelle", "consultations", "programme", "programmee"}
 
 
 def _racines(texte: str) -> set[str]:
@@ -198,9 +200,11 @@ def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str,
         return None
     miennes = [c for c in consultations if MEDECIN in norm(c.medecin)] or consultations
     # 1. Nom du patient prononcé pendant la consultation (comparaison locale)
-    texte = " " + re.sub(r"[^a-z]+", " ", norm(texte_brut)) + " "
+    # lettres doublées ignorées : Whisper écrit « Laffont » pour LAFONT, « Rebecquet » pour REBEQUET…
+    simple = lambda x: re.sub(r"(.)\1+", r"\1", x.replace("cq", "q").replace("ck", "k"))
+    texte = " " + simple(re.sub(r"[^a-z]+", " ", norm(texte_brut))) + " "
     cites = [c for c in consultations
-             if any(f" {norm(m)} " in texte for m in mots_du_nom(c.patient) if len(m) >= 4)]
+             if any(f" {simple(norm(m))} " in texte for m in mots_du_nom(c.patient) if len(m) >= 4)]
     if len(cites) == 1:
         return cites[0]
     candidats = cites or ([c for c in miennes if norm_nom(c.patient) not in deja_faits] or miennes)

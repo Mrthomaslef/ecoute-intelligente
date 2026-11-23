@@ -108,3 +108,16 @@ class TestPatientEnAvance(unittest.TestCase):
       assert choisir(cs, datetime(2026, 11, 23, 10, 11), "bonjour asseyez-vous", {"boulbetatechesamira"}).row == 50
       # nom prononcé : prioritaire
       assert choisir(cs, datetime(2026, 11, 23, 10, 11), "madame lafont bonjour", {"boulbetatechesamira"}).row == 50
+
+
+class TestNomMalOrthographie(unittest.TestCase):
+    def test_laffont_pour_lafont(self):
+        """23/11 : « Madame Laffont » (note de 11h23) rangée chez Bouvrais (créneau 11h30)."""
+        from datetime import datetime
+        from ecoute.agenda import Consultation, choisir
+        cs = [Consultation(50, "23/11/2026", "10h30", "Mme LAFONT Estelle", "Dr LEFEVRE Thomas", "CS pré-interventionnelle (RF ostéome ostéoïde col fémoral G)", "CS anesth 15/12"),
+              Consultation(44, "23/11/2026", "11h30", "Mme BOUVRAIS Valérie", "Dr LEFEVRE Thomas", "CS de réévaluation (reliquat d'ostéoblastome branche ilio-pubienne D)", "Expliquer le traitement percutané et évaluer l'acceptation du risque sur le nerf obturateur.")]
+        texte = "Je complète pour Madame Laffont si l'enregistrement n'est pas passé. ostéome du col, radiofréquence, je lui ai expliqué les risques, traitement par kétoprofène"
+        self.assertEqual(choisir(cs, datetime(2026, 11, 23, 11, 23), texte).row, 50)
+        texte2 = "Je complète pour madame, ostéome ostéoïde du col fémoral, radiofréquence, consultation d'anesthésie, je lui ai expliqué les risques et le traitement"
+        self.assertEqual(choisir(cs, datetime(2026, 11, 23, 11, 23), texte2).row, 50)
