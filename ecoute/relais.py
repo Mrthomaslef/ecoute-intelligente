@@ -182,7 +182,10 @@ def a_traiter(anciennete_min: float = 0) -> list[tuple[Path, dict]]:
             info = json.loads(fiche.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if anciennete_min and time.time() - fiche.stat().st_mtime < anciennete_min:
+        # Ancienneté comptée depuis l'ARRIVÉE sur ce Mac (ctime) : rclone/iCloud conservent la date d'origine
+        # (mtime), ce qui faisait traiter une consultation avant l'arrivée de la note dictée juste après.
+        st_f = fiche.stat()
+        if anciennete_min and time.time() - max(st_f.st_mtime, st_f.st_ctime) < anciennete_min:
             continue
         wav = fiche.with_suffix("")  # x.m4a.json → x.m4a
         if wav.name in deja_recus():  # déjà reçu par l'autre canal : doublon écarté (rien n'est supprimé)

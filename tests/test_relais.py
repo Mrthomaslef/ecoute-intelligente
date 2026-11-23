@@ -150,3 +150,20 @@ class TestNoteFinale(unittest.TestCase):
         autre = (Path("c.m4a"), {"debut": "2026-11-23T10:00:00", "fin": "2026-11-23T10:10:00", "type": "cr"})
         g = relais.grouper([autre, note, a])
         self.assertEqual([[p[0].name for p in x] for x in g], [["a.m4a", "b.m4a"], ["c.m4a"]])
+
+
+class TestAttenteArrivee(unittest.TestCase):
+    def test_date_d_origine_conservee_ne_court_circuite_pas_l_attente(self):
+        import json, os, tempfile, time
+        from pathlib import Path
+        from unittest import mock
+        from ecoute import cli, relais
+        with tempfile.TemporaryDirectory() as d:
+            rel = Path(d)
+            a = rel / "2026-11-23_09h22_cr.m4a"; a.write_bytes(b"x" * 10)
+            f = rel / f"{a.name}.json"; f.write_text(json.dumps({"debut": "2026-11-23T09:22:00", "taille": 10}))
+            vieux = time.time() - 3600
+            os.utime(f, (vieux, vieux)); os.utime(a, (vieux, vieux))  # comme rclone : date d'origine gardée
+            with mock.patch.object(relais, "RELAIS", rel), mock.patch.object(relais, "present_localement", lambda p: True), \
+                 mock.patch.object(cli, "DOSSIER", rel):
+                self.assertEqual(relais.a_traiter(anciennete_min=180), [])  # arrivé à l'instant : on attend
