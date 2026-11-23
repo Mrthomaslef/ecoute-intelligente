@@ -317,7 +317,7 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
     doc, contexte, premiere = None, None, None
     if patient:
         try:
-            doc, contexte = dossier.document_du_patient(debut, fin, agenda.mots_du_nom(patient.patient))
+            doc, contexte = dossier.document_du_patient(debut, None, agenda.mots_du_nom(patient.patient))  # document déposé après l'écoute accepté : c'est le nom du patient qui compte
             premiere = doc is None
             log(f"Dossier antérieur trouvé dans Drive : « {doc.titre} »." if doc
                 else "Aucun document au nom du patient dans Drive : première consultation.")

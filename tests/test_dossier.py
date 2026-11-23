@@ -50,6 +50,12 @@ class TestDossier(unittest.TestCase):
         self.assertTrue(concerne("Mme Dos Santos", ["SANTOS"]))
         self.assertFalse(concerne("Mme Dos Santos", ["DOS"]))
 
+    def test_document_depose_apres_l_ecoute(self):
+        # Le document du patient est souvent déposé juste après la consultation : il doit être retenu.
+        docs = [Document("x", "c/Coeuille", "Coeuille", datetime(2026, 11, 23, 8, 47))]
+        d, t = document_du_patient(datetime(2026, 11, 23, 8, 39), None, ["COEUILLE", "Frederic"], docs, lambda d: "CR")
+        self.assertEqual(d.id, "x")
+
 
 if __name__ == "__main__":
     unittest.main()
