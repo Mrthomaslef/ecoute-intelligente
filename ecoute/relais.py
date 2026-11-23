@@ -28,6 +28,13 @@ RELAIS = Path(os.environ.get(
 
 # iPhone (app Dictaphone) : « Enregistrer dans Fichiers » › iCloud Drive › EcouteIntelligente › iPhone RCP.
 # Tout audio déposé ici est traité comme une RCP (jamais déposé dans l'Agenda RI).
+# Second canal, indépendant d'iCloud : Google Drive (rclone, remote « gdrive »).
+DRIVE_RELAIS = os.environ.get("ECOUTE_DRIVE_RELAIS", "gdrive:01 - Cochin (en cours)/EcouteIntelligente Relais")
+INTERVALLE_DRIVE = 30  # s entre deux consultations du dossier Drive (Mac mini)
+ATTENTE_NOTE = 3 * 60   # s : on attend une éventuelle note dictée juste après la consultation avant de rédiger
+ECART_NOTE = 20 * 60    # s : un enregistrement commencé moins de 20 min après la fin du précédent = même consultation
+_dernier_drive = [0.0]
+
 DEPOT_IPHONE = Path(os.environ.get("ECOUTE_DEPOT_IPHONE", RELAIS.parent / "iPhone RCP"))
 
 
@@ -59,8 +66,78 @@ def envoyer(wav: Path, debut: datetime, fin: datetime, type_note: str) -> Path:
     fiche = {"debut": debut.isoformat(timespec="seconds"), "fin": fin.isoformat(timespec="seconds"),
              "type": type_note, "taille": cible.stat().st_size, "machine": os.uname().nodename}
     (RELAIS / f"{cible.name}.json").write_text(json.dumps(fiche), encoding="utf-8")
+    envoyer_drive(cible, RELAIS / f"{cible.name}.json")
     shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))  # copie locale gardée
     return cible
+
+
+def _rclone() -> str | None:
+    from . import dossier
+    return dossier.rclone()
+
+
+def envoyer_drive(audio: Path, fiche: Path) -> bool:
+    """Copie aussi l'enregistrement sur Google Drive (si iCloud est bloqué, le Mac mini le prend là)."""
+    exe = _rclone()
+    if not exe:
+        cli.log("Drive : rclone absent, envoi par iCloud seulement.")
+        return False
+    try:
+        for f in (audio, fiche):  # l'audio d'abord, la fiche ensuite (= copie complète)
+            r = subprocess.run([exe, "copy", str(f), DRIVE_RELAIS], capture_output=True, text=True, timeout=600)
+            if r.returncode != 0:
+                cli.log(f"Drive : envoi impossible ({(r.stderr.strip().splitlines() or ['?'])[-1]}).")
+                return False
+        cli.log("Enregistrement envoyé aussi par Google Drive.")
+        return True
+    except (OSError, subprocess.SubprocessError) as e:
+        cli.log(f"Drive : envoi impossible ({e}).")
+        return False
+
+
+# ---------------------------------------------------- registre des reçus
+def _registre() -> Path:
+    return cli.DOSSIER / ".relais_recus.json"
+
+
+def deja_recus() -> set[str]:
+    try:
+        return set(json.loads(_registre().read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return set()
+
+
+def marquer_recu(nom: str) -> None:
+    noms = deja_recus() | {nom}
+    _registre().write_text(json.dumps(sorted(noms)[-500:]), encoding="utf-8")
+
+
+def recuperer_drive(force: bool = False) -> list[str]:
+    """Mac mini : rapatrie dans le relais local les enregistrements arrivés par Google Drive."""
+    if not force and time.time() - _dernier_drive[0] < INTERVALLE_DRIVE:
+        return []
+    _dernier_drive[0] = time.time()
+    exe = _rclone()
+    if not exe:
+        return []
+    r = subprocess.run([exe, "lsjson", DRIVE_RELAIS, "--files-only"], capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        return []
+    fichiers = {f["Name"]: f for f in json.loads(r.stdout or "[]")}
+    recus, venus = deja_recus(), []
+    RELAIS.mkdir(parents=True, exist_ok=True)
+    for nom in sorted(fichiers):
+        if not nom.endswith(".json"):
+            continue
+        audio = nom[:-len(".json")]
+        if audio in recus or audio not in fichiers or (RELAIS / nom).exists():
+            continue
+        for f in (audio, nom):  # audio d'abord, fiche ensuite
+            subprocess.run([exe, "copyto", f"{DRIVE_RELAIS}/{f}", str(RELAIS / f)],
+                           capture_output=True, timeout=600, check=True)
+        cli.log(f"Drive : {audio} récupéré.")
+        venus.append(audio)
+    return venus
 
 
 # --------------------------------------------------------------- Mac mini
@@ -108,6 +185,13 @@ def a_traiter(anciennete_min: float = 0) -> list[tuple[Path, dict]]:
         if anciennete_min and time.time() - fiche.stat().st_mtime < anciennete_min:
             continue
         wav = fiche.with_suffix("")  # x.m4a.json → x.m4a
+        if wav.name in deja_recus():  # déjà reçu par l'autre canal : doublon écarté (rien n'est supprimé)
+            doublons = cli.AUDIO / "_doublons"
+            doublons.mkdir(parents=True, exist_ok=True)
+            for f in (wav, fiche):
+                if f.exists():
+                    shutil.move(str(f), cli.chemin_libre(doublons, f.stem, f.suffix))
+            continue
         _telecharger(wav)
         if not wav.exists() or not present_localement(wav):
             continue
@@ -124,6 +208,13 @@ def traiter(wav: Path, info: dict) -> Path | None:
     fin = datetime.fromisoformat(info.get("fin") or info["debut"])
     type_note = info.get("type", "cr")
     fiche = RELAIS / f"{wav.name}.json"
+    marquer_recu(wav.name)
+    if type_note == "test":  # essai de bout en bout du relais : rien n'est transcrit ni déposé
+        cli.log(f"Relais : TEST reçu ({wav.name}, {wav.stat().st_size} o) — chaîne MacBook → Mac mini OK.")
+        cli.notifier("Test du relais reçu sur le Mac mini.")
+        shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
+        fiche.unlink(missing_ok=True)
+        return None
     cli.log(f"Relais : enregistrement de {debut:%Hh%M} reçu du MacBook.")
     brut = cli.transcrire_audio(wav)
     if not brut.strip():
@@ -204,3 +295,48 @@ def recuperer(wav: Path) -> None:
     (RELAIS / f"{cible.name}.json").write_text(json.dumps(
         {"debut": debut.isoformat(timespec="seconds"), "fin": fin.isoformat(timespec="seconds"),
          "type": type_note, "taille": cible.stat().st_size, "machine": os.uname().nodename}), encoding="utf-8")
+
+
+# ------------------------------------------------ consultation + note finale
+def grouper(prets: list[tuple[Path, dict]]) -> list[list[tuple[Path, dict]]]:
+    """Regroupe une consultation et la (ou les) note(s) dictée(s) juste après (même patient, même moment)."""
+    def bornes(info):
+        d = datetime.fromisoformat(info["debut"])
+        return d, datetime.fromisoformat(info.get("fin") or info["debut"])
+    groupes: list[list[tuple[Path, dict]]] = []
+    for item in sorted(prets, key=lambda p: p[1]["debut"]):
+        if item[1].get("type", "cr") != "cr":
+            groupes.append([item])
+            continue
+        prec = groupes[-1] if groupes and groupes[-1][-1][1].get("type", "cr") == "cr" else None
+        if prec and (bornes(item[1])[0] - bornes(prec[-1][1])[1]).total_seconds() <= ECART_NOTE:
+            prec.append(item)
+        else:
+            groupes.append([item])
+    return groupes
+
+
+def traiter_groupe(groupe: list[tuple[Path, dict]]) -> Path | None:
+    """Une consultation suivie de notes dictées : une seule transcription, un seul CR."""
+    if len(groupe) == 1:
+        return traiter(*groupe[0])
+    premier, info0 = groupe[0]
+    debut = datetime.fromisoformat(info0["debut"])
+    fin = datetime.fromisoformat(groupe[-1][1].get("fin") or groupe[-1][1]["debut"])
+    cli.log(f"Relais : consultation de {debut:%Hh%M} + {len(groupe) - 1} note(s) dictée(s) à la suite, réunies en un seul CR.")
+    parties = []
+    for i, (wav, info) in enumerate(groupe):
+        marquer_recu(wav.name)
+        texte = cli.transcrire_audio(wav).strip()
+        if i == 0:
+            parties.append(texte)
+        elif texte:
+            parties.append("--- NOTE DICTÉE PAR LE MÉDECIN APRÈS LA CONSULTATION (prioritaire pour la synthèse, "
+                           "la décision et la conduite à tenir) ---\n" + texte)
+    brut = "\n\n".join(p for p in parties if p)
+    sortie = cli.consultation_vers_agenda(brut, premier, debut, fin=fin, poste_local=False) if brut.strip() else None
+    for wav, _ in groupe:
+        if wav.exists():
+            shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
+        (RELAIS / f"{wav.name}.json").unlink(missing_ok=True)
+    return sortie

@@ -8,6 +8,8 @@ Une ligne « TYPE DE CONSULTATION » peut précéder la transcription. « PREMI�
 
 Des « CR VALIDÉS PAR LE DR LEFEVRE » peuvent précéder la transcription : ce sont ses lettres définitives. Ils priment sur tout le reste pour la forme : imite leur longueur, leur structure et leurs formulations, sans jamais reprendre leurs données cliniques.
 
+Une section « NOTE DICTÉE PAR LE MÉDECIN APRÈS LA CONSULTATION » peut suivre la transcription : c'est le Dr Lefevre qui complète ou corrige seul, après le départ du patient. Elle PRIME sur tout le reste (synthèse, décision, conduite à tenir, examens, délais) : intègre-la fidèlement, et en cas de contradiction avec l'échange, suis la note.
+
 Rédige directement le compte-rendu, prêt à être collé dans le dossier, sans titre ni commentaire autour, en reproduisant EXACTEMENT la trame habituelle du Dr Lefevre (RÉSUMÉ PERTINENT : 3 à 4 paragraphes courts de prose, 600 à 1 100 caractères au total, seulement l’essentiel : motif, rappel bref, décision, information) :
 
 Cher confrère, chère consœur,

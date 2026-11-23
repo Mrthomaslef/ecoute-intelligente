@@ -419,14 +419,22 @@ def surveiller(intervalle: float) -> None:
         # Mac mini : enregistrements envoyés par le MacBook. MacBook (enregistreur) : repli
         # automatique s'ils ne sont pas pris en charge à temps (iCloud bloqué, Mac mini éteint).
         delai = 0 if not relais.est_enregistreur() else relais.DELAI_REPLI
-        for wav, info in relais.a_traiter(anciennete_min=delai):
-            if wav in echecs:
+        if not relais.est_enregistreur():
+            try:
+                relais.recuperer_drive()  # second canal : Google Drive (iCloud peut être bloqué)
+            except Exception as e:  # noqa: BLE001
+                log(f"Drive : récupération impossible ({e}).")
+        # Mac mini : on laisse ATTENTE_NOTE au médecin pour dicter une note juste après la consultation,
+        # puis consultation + note(s) sont réunies en un seul CR.
+        attente = delai if relais.est_enregistreur() else relais.ATTENTE_NOTE
+        for groupe in relais.grouper(relais.a_traiter(anciennete_min=attente)):
+            if any(w in echecs for w, _ in groupe):
                 continue
             try:
-                relais.traiter(wav, info)
+                relais.traiter_groupe(groupe)
             except Exception as e:  # noqa: BLE001
-                echecs.add(wav)
-                log(f"ERREUR relais {wav.name} : {e}")
+                echecs.update(w for w, _ in groupe)
+                log(f"ERREUR relais {groupe[0][0].name} : {e}")
         if not relais.est_enregistreur():  # RCP enregistrées sur l'iPhone (Dictaphone → iCloud)
             relais.DEPOT_IPHONE.mkdir(parents=True, exist_ok=True)
             for audio in relais.depots_iphone(tailles):
