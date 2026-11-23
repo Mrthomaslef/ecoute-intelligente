@@ -502,6 +502,9 @@ def main() -> None:
     su.add_argument("--sans-drive", action="store_true")
     dr = sp.add_parser("drive", help="range le dossier Drive de dépôt (archives) et crée les dossiers du jour")
     dr.add_argument("--essai", action="store_true", help="affiche sans rien déplacer")
+    co = sp.add_parser("controle", help="contrôle du lundi : vérifie, répare, range le Drive et envoie un iMessage")
+    co.add_argument("--sans-message", action="store_true", help="affiche seulement, sans iMessage")
+    co.add_argument("--sans-rangement", action="store_true", help="ne range pas le Drive")
     sp.add_parser("micros", help="liste les micros disponibles")
     sp.add_parser("agenda", help="vérifie l'accès à l'Agenda RI et liste les consultations du jour")
     a = p.parse_args()
@@ -543,6 +546,9 @@ def main() -> None:
             initiales = "".join(m[0].upper() for m in agenda.mots_du_nom(c.patient))
             print(f"{c.horaire or '?':>8}  {initiales:<5} {c.medecin[:30]:<30} {c.titre[:60]}")
         print("✅ Agenda accessible.")
+    elif a.cmd == "controle":
+        from .controle import main as controle
+        raise SystemExit(controle(envoyer=not a.sans_message, rangement=not a.sans_rangement))
     elif a.cmd == "micros":
         import sounddevice as sd
         print(sd.query_devices())

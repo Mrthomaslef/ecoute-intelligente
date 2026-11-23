@@ -84,6 +84,16 @@ Les trames de rédaction se modifient dans `prompts/cr.md` et `prompts/rcp.md`.
 - Les noms de fichiers sont horodatés pour ne jamais reprendre le nom de l'audio.
 - Claude est appelé via `claude -p`, sans outils et sans historique de session. Variables d'environnement : `ECOUTE_MODELE` (par défaut `sonnet`), `ECOUTE_DOSSIER`, `ECOUTE_WHISPER`.
 
+## Contrôle automatique du lundi (Mac mini, 6h30)
+
+Chaque lundi à 6h30, l'agent launchd `com.thomaslefevre.ecoute.lundi` lance `ecoute controle`, qui :
+1. range le dossier Drive de dépôt et crée « Consultation JJ/MM » et « RCP JJ/MM » ;
+2. vérifie le code (mis à jour depuis GitHub si besoin), les tests, le service de traitement, la veille, le relais iCloud, les modèles Whisper, Claude, l'Agenda RI, le compte AP-HP dans Mail et le Drive ;
+3. répare seul ce qui peut l'être (relance du service, `git pull`, téléchargement iCloud, dossiers du jour), puis revérifie ;
+4. envoie un iMessage : « tout est prêt ✅ », ou la liste des ❌ avec la marche à suivre.
+
+Rapport : `~/EcouteIntelligente/.controle_lundi.txt`. À la main : `ecoute controle` (ou `--sans-message`, `--sans-rangement`).
+
 ## Rangement du Drive (chaque lundi, automatique)
 
 `ecoute drive` (`--essai` pour voir sans rien faire) range **Drive › 1sceenshot et texte com** : les dossiers et fichiers datés antérieurs à aujourd'hui (« Consultation 16/11 », « CR OP 03/11 », « Echo 13/11 », « RCP 16/11 »…) vont dans « *Mois* archives », à l'intérieur du même dossier (les CR validés restent trouvés comme modèles). Déplacement par simple changement de dossier parent : rien n'est renommé, converti, supprimé ni écrasé. Puis il crée « Consultation JJ/MM » et « RCP JJ/MM » du jour. Les trames de CR sont dans « Modèles CR ».
