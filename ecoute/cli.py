@@ -478,6 +478,8 @@ def main() -> None:
     su.add_argument("--sans-brouillons", action="store_true")
     su.add_argument("--sans-agenda", action="store_true")
     su.add_argument("--sans-drive", action="store_true")
+    dr = sp.add_parser("drive", help="range le dossier Drive de dépôt (archives) et crée les dossiers du jour")
+    dr.add_argument("--essai", action="store_true", help="affiche sans rien déplacer")
     sp.add_parser("micros", help="liste les micros disponibles")
     sp.add_parser("agenda", help="vérifie l'accès à l'Agenda RI et liste les consultations du jour")
     a = p.parse_args()
@@ -510,6 +512,9 @@ def main() -> None:
         suite_rcp(a.transcription.expanduser().read_text(encoding="utf-8"),
                   datetime.strptime(a.date, "%d/%m/%Y"), brouillons=not a.sans_brouillons,
                   agenda_ri=not a.sans_agenda, drive=not a.sans_drive)
+    elif a.cmd == "drive":
+        from .drive_menage import main as menage
+        menage(essai=a.essai)
     elif a.cmd == "agenda":
         from . import agenda
         for c in agenda.consultations_du(datetime.now()):

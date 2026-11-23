@@ -84,6 +84,10 @@ Les trames de rédaction se modifient dans `prompts/cr.md` et `prompts/rcp.md`.
 - Les noms de fichiers sont horodatés pour ne jamais reprendre le nom de l'audio.
 - Claude est appelé via `claude -p`, sans outils et sans historique de session. Variables d'environnement : `ECOUTE_MODELE` (par défaut `sonnet`), `ECOUTE_DOSSIER`, `ECOUTE_WHISPER`.
 
+## Rangement du Drive (chaque lundi, automatique)
+
+`ecoute drive` (`--essai` pour voir sans rien faire) range **Drive › 1sceenshot et texte com** : les dossiers et fichiers datés antérieurs à aujourd'hui (« Consultation 16/11 », « CR OP 03/11 », « Echo 13/11 », « RCP 16/11 »…) vont dans « *Mois* archives », à l'intérieur du même dossier (les CR validés restent trouvés comme modèles). Déplacement par simple changement de dossier parent : rien n'est renommé, converti, supprimé ni écrasé. Puis il crée « Consultation JJ/MM » et « RCP JJ/MM » du jour. Les trames de CR sont dans « Modèles CR ».
+
 ## Après la RCP : Word, brouillons de mails et missions (automatique, Mac mini)
 
 **Avant la RCP**, déposer la liste préparatoire (« NOM Prénom IPP » en tête, puis les CR d'imagerie) dans **Drive › 1sceenshot et texte com › RCP JJ/MM**. À la fin du traitement de la RCP (MacBook, iPhone ou `ecoute rcp`), le Mac mini :
