@@ -92,3 +92,19 @@ class TestReidentifier(unittest.TestCase):
         self.assertEqual(reidentifier(cr, c, ddn="05/05/1962"),
                          "J'ai revu ce jour Madame Julienne SUPA KANZI, âgée de 64 ans (née le 05/05/1962), un mois après.")
         self.assertEqual(reidentifier(cr, c), "J'ai revu ce jour Madame Julienne SUPA KANZI, âgée de 64 ans, un mois après.")
+
+
+class TestPatientEnAvance(unittest.TestCase):
+  def test_patient_en_avance_reconnu_par_le_motif(self):
+      """23/11 : Mme Rebequet (11h00) vue à 10h11 sans dire son nom → rangée chez Boulbetateche (10h00)."""
+      from datetime import datetime
+      from ecoute.agenda import Consultation, choisir
+      cs = [Consultation(49, "23/11/2026", "10h00", "BOULBETATECHE Samira", "Dr LEFEVRE Thomas", "Consultation pré-cryo névrome de Morton droit"),
+            Consultation(50, "23/11/2026", "10h30", "Mme LAFONT Estelle", "Dr LEFEVRE Thomas", "CS pré-interventionnelle (RF ostéome ostéoïde col fémoral G)", "CS anesth 15/12"),
+            Consultation(51, "23/11/2026", "11h00", "REBEQUET Joceline", "Dr LEFEVRE Thomas", "Consultation spécialisée", "Évaluation cryoneurolyse post-zona (bloc test nerf intercostal +)")]
+      texte = "depuis le zona j'ai mal sous le sein, le bloc test a marché, on va traiter le nerf intercostal, pas d'anesthésiste"
+      assert choisir(cs, datetime(2026, 11, 23, 10, 11), texte, {"boulbetatechesamira"}).row == 51
+      # sans indice de contenu : le patient déjà fait est écarté, créneau le plus proche parmi les autres
+      assert choisir(cs, datetime(2026, 11, 23, 10, 11), "bonjour asseyez-vous", {"boulbetatechesamira"}).row == 50
+      # nom prononcé : prioritaire
+      assert choisir(cs, datetime(2026, 11, 23, 10, 11), "madame lafont bonjour", {"boulbetatechesamira"}).row == 50

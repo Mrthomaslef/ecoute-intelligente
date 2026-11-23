@@ -37,6 +37,7 @@ class Consultation:
     patient: str
     medecin: str
     titre: str
+    remarques: str = ""
 
     @property
     def iso(self) -> str:
@@ -154,7 +155,8 @@ def consultations_du(jour: datetime) -> list[Consultation]:
             Consultation(int(r.get("_row", 0)), date, str(r.get("Horaire", "")).strip(),
                          str(r.get("Identité Patient", "")).strip(),
                          str(r.get("Médecin en charge", "")).strip(),
-                         str(r.get("Type d'acte / Consultation", "")).strip())
+                         str(r.get("Type d'acte / Consultation", "")).strip(),
+                         str(r.get("Instructions & Remarques", "")).strip())
             for r in lire_tout().get("Consultations", [])
             if str(r.get("Date", "")).strip() == date and str(r.get("Identité Patient", "")).strip()
         ]
@@ -166,7 +168,7 @@ def _consultations_eval(date: str) -> list[Consultation]:
       var out = [];
       for (var i = 8; i < v.length; i++) {{
         if (String(v[i][1]).trim() === {json.dumps(date)} && String(v[i][3]).trim())
-          out.push([i + 1, v[i][1], v[i][2], v[i][3], v[i][5], v[i][6]]);
+          out.push([i + 1, v[i][1], v[i][2], v[i][3], v[i][5], v[i][6], v[i][8]]);
       }}
       return out;
     """)
@@ -174,7 +176,24 @@ def _consultations_eval(date: str) -> list[Consultation]:
 
 
 # ------------------------------------------------------------ appariement
-def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str) -> Consultation | None:
+_MOTS_VIDES = {"consultation", "teleconsultation", "specialisee", "suivi", "pour", "avec", "sous", "dans", "voir",
+               "mail", "post", "apporter", "date", "prevue", "prevu", "visio", "distance", "radio", "patient",
+               "patiente", "douleur", "douleurs", "droit", "droite", "gauche", "jour", "mois", "fait", "faire"}
+
+
+def _racines(texte: str) -> set[str]:
+    return {m[:6] for m in re.findall(r"[a-z]{4,}", norm(texte)) if m not in _MOTS_VIDES}
+
+
+def score_contenu(c: Consultation, texte_brut: str) -> int:
+    """Nombre de mots du motif / des remarques de l'agenda retrouvés dans la transcription (zona, intercostal…)."""
+    motif = _racines(f"{c.titre} {c.remarques}") - _racines(c.patient)
+    return len(motif & _racines(texte_brut))
+
+
+def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str,
+            deja_faits: set[str] | frozenset[str] = frozenset()) -> Consultation | None:
+    """deja_faits : patients (norm_nom) dont la consultation du jour a déjà son CR — écartés si le nom n'est pas cité."""
     if not consultations:
         return None
     miennes = [c for c in consultations if MEDECIN in norm(c.medecin)] or consultations
@@ -184,8 +203,12 @@ def choisir(consultations: list[Consultation], debut: datetime, texte_brut: str)
              if any(f" {norm(m)} " in texte for m in mots_du_nom(c.patient) if len(m) >= 4)]
     if len(cites) == 1:
         return cites[0]
-    # 2. Créneau horaire le plus proche du début de l'enregistrement
-    candidats = cites or miennes
+    candidats = cites or ([c for c in miennes if norm_nom(c.patient) not in deja_faits] or miennes)
+    # 2. Contenu : motif de la consultation retrouvé dans la transcription (patient arrivé en avance/retard)
+    scores = sorted(((score_contenu(c, texte_brut), i) for i, c in enumerate(candidats)), reverse=True)
+    if scores and scores[0][0] >= 2 and (len(scores) == 1 or scores[0][0] > scores[1][0]):
+        return candidats[scores[0][1]]
+    # 3. Créneau horaire le plus proche du début de l'enregistrement
     t = debut.hour * 60 + debut.minute
     proches = sorted(
         ((abs(c.minutes() - t), c) for c in candidats if c.minutes() is not None),

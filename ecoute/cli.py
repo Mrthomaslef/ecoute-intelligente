@@ -275,6 +275,17 @@ def rediger(note: Path, noms_extra: list[str] | None = None, trame: str | None =
 TRANSCRIPTIONS = DOSSIER / "Transcriptions"
 
 
+def patients_deja_faits(debut: datetime, consultations) -> set[str]:
+    """Patients du jour dont la consultation a déjà été transcrite (en-têtes « ## HHhMM — NOM (créneau …) »)."""
+    from . import agenda
+    try:
+        texte = (TRANSCRIPTIONS / f"{debut:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    entetes = re.findall(r"^## \d{2}h\d{2} — (.+?) \(créneau", texte, re.M)
+    return {agenda.norm_nom(c.patient) for c in consultations if c.patient in entetes}
+
+
 def ajouter_transcription_du_jour(note: Path, debut: datetime, patient=None) -> Path:
     """Ajoute la transcription anonymisée à ~/EcouteIntelligente/Transcriptions/AAAA-MM-JJ.md (local)."""
     _, corps = lire_note(note)
@@ -309,7 +320,8 @@ def consultation_vers_agenda(brut: str, audio: Path | None, debut: datetime,
     consultations, patient = [], None
     try:
         consultations = agenda.consultations_du(debut)
-        patient = agenda.choisir(consultations, debut, brut)
+        patient = agenda.choisir(consultations, debut, brut,
+                                 set() if remplacer else patients_deja_faits(debut, consultations))
     except Exception as e:  # noqa: BLE001 — l'agenda est un bonus : le CR est produit quand même
         log(f"Agenda inaccessible ({e}).")
 

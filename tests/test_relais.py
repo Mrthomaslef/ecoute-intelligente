@@ -13,7 +13,10 @@ class TestRelais(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.p = [mock.patch.object(relais, "RELAIS", self.tmp / "icloud"),
                   mock.patch.object(cli, "TRAITES", self.tmp / "traites"),
-                  mock.patch.object(cli, "DOSSIER", self.tmp)]
+                  mock.patch.object(cli, "DOSSIER", self.tmp),
+                  # jamais le vrai Drive pendant les tests (le 23/11, des faux audios y ont été envoyés)
+                  mock.patch.object(relais, "DRIVE_RELAIS", str(self.tmp / "drive_factice")),
+                  mock.patch.object(relais, "envoyer_drive", lambda *a, **k: False)]
         for p in self.p:
             p.start()
         cli.TRAITES.mkdir()
