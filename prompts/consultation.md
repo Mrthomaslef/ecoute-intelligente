@@ -33,4 +33,5 @@ Règles strictes :
 - N'invente aucune donnée absente de la transcription et du dossier antérieur.
 - Désigne le patient uniquement par la balise [PATIENT] ; conserve [DATE] pour la date de naissance si elle a été masquée.
 - Anticoagulant / antiagrégant : seulement s'il est cité, en une phrase avec la consigne si elle a été donnée.
+- N'écris JAMAIS une balise [DATE] ailleurs que dans « (né(e) le [DATE]) » : si la date d'un geste ou d'un examen a été masquée, formule sans elle (« il y a un mois », « le mois dernier »).
 - Signature exacte : « Dr Thomas Lefevre » (sans accent), sans autre ligne après.

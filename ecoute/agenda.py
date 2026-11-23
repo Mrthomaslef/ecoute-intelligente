@@ -305,4 +305,5 @@ def reidentifier(cr: str, c: Consultation, tronquer: bool = True, ddn: str | Non
     if ddn:
         cr = re.sub(r"(n[ée]e? le )\[DATE\]", lambda m: m.group(1) + ddn, cr, count=1)
     cr = re.sub(r"\s*\(n[ée]e? le \[DATE\]\)", "", cr)  # date de naissance inconnue : on n'écrit pas la balise
+    cr = re.sub(r"\s+(?:le|du|en date du)\s+\[DATE\]", "", cr)  # toute autre date masquée : retirée plutôt que laissée
     return cr if not tronquer or len(cr) <= LIMITE_CHAMP else cr[:LIMITE_CHAMP].rsplit("\n", 1)[0] + "\n[…] (CR complet dans 4_CR_Prets)"
