@@ -427,7 +427,7 @@ def surveiller(intervalle: float) -> None:
         # Mac mini : on laisse ATTENTE_NOTE au médecin pour dicter une note juste après la consultation,
         # puis consultation + note(s) sont réunies en un seul CR.
         attente = delai if relais.est_enregistreur() else relais.ATTENTE_NOTE
-        for groupe in relais.grouper(relais.a_traiter(anciennete_min=attente)):
+        for groupe in relais.groupes_prets(attente):
             if any(w in echecs for w, _ in groupe):
                 continue
             try:

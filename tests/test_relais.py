@@ -167,3 +167,27 @@ class TestAttenteArrivee(unittest.TestCase):
             with mock.patch.object(relais, "RELAIS", rel), mock.patch.object(relais, "present_localement", lambda p: True), \
                  mock.patch.object(cli, "DOSSIER", rel):
                 self.assertEqual(relais.a_traiter(anciennete_min=180), [])  # arrivé à l'instant : on attend
+
+
+class TestGroupesPrets(unittest.TestCase):
+    def test_consultation_attend_sa_note_recente(self):
+        import json, os, tempfile, time
+        from pathlib import Path
+        from unittest import mock
+        from ecoute import cli, relais
+        with tempfile.TemporaryDirectory() as d:
+            rel = Path(d)
+            def depot(nom, debut, fin):
+                a = rel / nom; a.write_bytes(b"x" * 10)
+                (rel / f"{nom}.json").write_text(json.dumps({"debut": debut, "fin": fin, "type": "cr", "taille": 10}))
+                return a
+            cons = depot("2026-11-23_09h22_cr.m4a", "2026-11-23T09:22:38", "2026-11-23T09:26:49")
+            depot("2026-11-23_09h27_cr.m4a", "2026-11-23T09:27:03", "2026-11-23T09:27:42")
+            with mock.patch.object(relais, "RELAIS", rel), mock.patch.object(relais, "present_localement", lambda p: True), \
+                 mock.patch.object(cli, "DOSSIER", rel), \
+                 mock.patch.object(relais, "arrive_depuis", lambda w: 999 if w.name == cons.name else 5):
+                self.assertEqual(relais.groupes_prets(180), [])  # la note vient d'arriver : on attend
+            with mock.patch.object(relais, "RELAIS", rel), mock.patch.object(relais, "present_localement", lambda p: True), \
+                 mock.patch.object(cli, "DOSSIER", rel), mock.patch.object(relais, "arrive_depuis", lambda w: 999):
+                g = relais.groupes_prets(180)
+                self.assertEqual([[w.name for w, _ in x] for x in g], [["2026-11-23_09h22_cr.m4a", "2026-11-23_09h27_cr.m4a"]])

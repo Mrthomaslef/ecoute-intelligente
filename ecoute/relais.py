@@ -343,3 +343,21 @@ def traiter_groupe(groupe: list[tuple[Path, dict]]) -> Path | None:
             shutil.move(str(wav), cli.chemin_libre(cli.TRAITES, wav.stem, wav.suffix))
         (RELAIS / f"{wav.name}.json").unlink(missing_ok=True)
     return sortie
+
+
+def arrive_depuis(wav: Path) -> float:
+    """Secondes depuis l'arrivée de la fiche sur ce Mac (ctime ; la date d'origine est conservée par rclone/iCloud)."""
+    try:
+        st = (wav.parent / f"{wav.name}.json").stat()
+        return time.time() - max(st.st_mtime, st.st_ctime)
+    except OSError:
+        return 0.0
+
+
+def groupes_prets(attente: float) -> list[list[tuple[Path, dict]]]:
+    """Groupes (consultation + notes) dont TOUS les éléments sont arrivés depuis au moins `attente` s.
+
+    Le regroupement se fait sur tout ce qui est présent, même arrivé à l'instant : une consultation
+    n'est donc jamais traitée seule si sa note dictée vient d'arriver.
+    """
+    return [g for g in grouper(a_traiter()) if all(arrive_depuis(w) >= attente for w, _ in g)]
