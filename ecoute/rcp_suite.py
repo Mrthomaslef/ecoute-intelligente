@@ -316,6 +316,83 @@ def ecrire_word(data: dict, patients: list[PatientRCP], jour: datetime, sortie: 
     return sortie
 
 
+def lignes_concises(data: dict, patients: list) -> list[dict]:
+    lignes = []
+    for i, d in enumerate(data.get("dossiers", []), 1):
+        p = _patient(d, patients)
+        rid = lambda k: reidentifier(str(d.get(k) or ""), patients)  # noqa: E731
+        lignes.append({
+            "ri": str(d.get("geste_ri", "")).lower().startswith("oui"),
+            "patient": p.identite() if p else (rid("nom_entendu") or f"Dossier {i}"),
+            "detail": rid("age_sexe"),
+            "contexte": rid("contexte_court") or rid("titre_court"),
+            "decision": rid("decision_courte") or rid("decision"),
+            "suite": rid("suite_courte") or rid("suite"),
+        })
+    return lignes
+
+
+def ecrire_word_concis(lignes: list[dict], jour: datetime, sortie: Path) -> Path:
+    """Synthèse RCP concise : un tableau Patient | Contexte | Décision | Suite (🎯 = geste RI, suite en rouge).
+
+    lignes : [{"patient", "detail", "contexte", "decision", "suite", "ri": bool}]
+    """
+    from docx import Document
+    from docx.enum.section import WD_ORIENT
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt, RGBColor
+
+    bleu, rouge, gris = RGBColor(0x1F, 0x4E, 0x79), RGBColor(0xB9, 0x1C, 0x1C), RGBColor(0x66, 0x66, 0x66)
+    doc = Document()
+    sec = doc.sections[0]
+    sec.orientation = WD_ORIENT.LANDSCAPE
+    sec.page_width, sec.page_height = sec.page_height, sec.page_width
+    for m in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
+        setattr(sec, m, Cm(1.5))
+    st = doc.styles["Normal"]
+    st.font.name, st.font.size = "Calibri", Pt(10)
+    t = doc.add_paragraph().add_run(f"RCP Métastases osseuses — {jour:%d/%m/%Y}")
+    t.bold, t.font.size, t.font.color.rgb = True, Pt(16), bleu
+    sous = doc.add_paragraph().add_run("Synthèse Dr Thomas Lefevre (Radiologie B, Cochin) · 🎯 = geste pour l'équipe de RI "
+                                       "· à vérifier avec la fiche RCP officielle")
+    sous.font.size, sous.font.color.rgb = Pt(8.5), gris
+
+    def fond(cell, couleur):
+        tc = cell._tc.get_or_add_tcPr()
+        sh = OxmlElement("w:shd")
+        sh.set(qn("w:val"), "clear"), sh.set(qn("w:color"), "auto"), sh.set(qn("w:fill"), couleur)
+        tc.append(sh)
+
+    tab = doc.add_table(rows=1, cols=4)
+    tab.style = "Table Grid"
+    largeurs = (Cm(5.5), Cm(8), Cm(7.5), Cm(5.7))
+    for cell, titre, w in zip(tab.rows[0].cells, ("Patient", "Contexte", "Décision", "Suite"), largeurs):
+        cell.width = w
+        fond(cell, "1F4E79")
+        r = cell.paragraphs[0].add_run(titre)
+        r.bold, r.font.color.rgb = True, RGBColor(0xFF, 0xFF, 0xFF)
+    for i, l in enumerate(lignes):
+        cells = tab.add_row().cells
+        for c, w in zip(cells, largeurs):
+            c.width = w
+            if i % 2:
+                fond(c, "F2F6FA")
+        r = cells[0].paragraphs[0].add_run(("🎯 " if l.get("ri") else "") + l.get("patient", ""))
+        r.bold = True
+        if l.get("detail"):
+            d = cells[0].add_paragraph().add_run(l["detail"])
+            d.font.size, d.font.color.rgb = Pt(8.5), gris
+        cells[1].paragraphs[0].add_run(l.get("contexte", ""))
+        rd = cells[2].paragraphs[0].add_run(l.get("decision", ""))
+        rd.bold = True
+        rs = cells[3].paragraphs[0].add_run(l.get("suite", ""))
+        if l.get("ri"):
+            rs.bold, rs.font.color.rgb = True, rouge
+    doc.save(sortie)
+    return sortie
+
+
 def deposer_word_drive(local: Path, dossier_drive: str | None, jour: datetime) -> str:
     from . import dossier
     cible = dossier_drive or f"RCP {jour:%d}／{jour:%m}"
@@ -371,7 +448,7 @@ SCRIPT_BROUILLON_PJ = r'''
 on run argv
   set {sujet, corps, expediteur, dest, pj} to {item 1 of argv, item 2 of argv, item 3 of argv, item 4 of argv, item 5 of argv}
   tell application "Mail"
-    set m to make new outgoing message with properties {subject:sujet, content:corps & return & return, visible:false}
+    set m to make new outgoing message with properties {subject:sujet, content:corps & return, visible:false}
     set sender of m to expediteur
     tell m to make new to recipient at end of to recipients with properties {address:dest}
     tell content of m to make new attachment with properties {file name:(POSIX file pj)} at after last paragraph
@@ -399,8 +476,7 @@ def synthese_courte(data: dict, patients: list, jour: datetime) -> str:
 
 def brouillon_word(word: Path, jour: datetime, a: list[str] = WORD_A, corps: str | None = None) -> None:
     """Brouillon « Synthèse RCP JJ/MM » adressé à Marie-Pauline : synthèse courte + Word joint (Thomas relit et envoie)."""
-    corps = corps or (f"Bonjour Marie-Pauline,\n\nCi-joint la synthèse de la RCP du {jour:%d/%m/%Y}.\n\n"
-                      "Bien amicalement,\nThomas")
+    corps = corps or ""  # Thomas : pas de texte dans le mail, le Word suffit
     for dest in a:
         r = subprocess.run(["osascript", "-", f"Synthèse RCP du {jour:%d/%m/%Y}", corps, MOI, dest, str(word)],
                            input=SCRIPT_BROUILLON_PJ, capture_output=True, text=True, timeout=120)
@@ -497,11 +573,12 @@ def suite_rcp(brut: str, jour: datetime, brouillons: bool = True, agenda_ri: boo
     mails = mails_finaux(data, patients, jour)
     base = cli.chemin_libre(cli.PRETS, f"Synthèse RCP {jour:%d-%m-%Y}", ".docx")
     try:
-        ecrire_word(data, patients, jour, base)
+        ecrire_word_concis(lignes_concises(data, patients), jour, base)
+        ecrire_word(data, patients, jour, cli.chemin_libre(cli.PRETS, f"Synthèse RCP {jour:%d-%m-%Y} (détail)", ".docx"))
         bilan["word"] = str(base)
         if brouillons:
             try:
-                brouillon_word(base, jour, corps=synthese_courte(data, patients, jour))
+                brouillon_word(base, jour)
                 cli.log(f"RCP : brouillon (Word joint) préparé pour {', '.join(WORD_A)} — à envoyer par le Dr Lefevre.")
             except Exception as e:  # noqa: BLE001
                 cli.log(f"RCP : brouillon Word non créé ({e}).")

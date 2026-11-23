@@ -12,7 +12,7 @@ if ! command -v uv >/dev/null; then
   else curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh; fi
 fi
 [[ -d .venv ]] || uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python mlx-whisper sounddevice numpy
+uv pip install --python .venv/bin/python mlx-whisper sounddevice numpy python-docx
 mkdir -p "$HOME/.local/bin"
 if ! command -v ffmpeg >/dev/null; then
   if command -v brew >/dev/null; then brew install ffmpeg

@@ -20,8 +20,10 @@ TA TÂCHE : produire UNIQUEMENT un objet JSON valide (aucun texte autour, pas de
       "geste_ri": "Oui — électrochimiothérapie de la lame droite (équipe RI Cochin)" ou "Non",
       "suite": "Ce qui reste à programmer ou à faire.",
       "incertain": "Ce qui est ambigu dans l'enregistrement, ou chaîne vide",
-      "titre_court": "Femme 96 ans, métastase T10-T12 (sein)",
-      "court": "Électrochimiothérapie T10-T12 retenue → CS pré-geste à programmer rapidement."
+      "nom_entendu": "Nom tel qu'épelé ou prononcé en séance si le patient n'est pas dans la liste (ex. « M. BOUKHSSIM Lahcen »), sinon chaîne vide",
+      "contexte_court": "1-2 phrases : primitif, traitement, lésion et imagerie clé.",
+      "decision_courte": "1 phrase : décision retenue.",
+      "suite_courte": "1 phrase télégraphique : ce qui reste à faire (· entre les actions)."
     }
   ],
   "missions": [
@@ -38,7 +40,8 @@ TA TÂCHE : produire UNIQUEMENT un objet JSON valide (aucun texte autour, pas de
 }
 
 RÈGLES :
-- "titre_court" (≤ 10 mots : sexe, âge, pathologie, localisation) et "court" (UNE phrase de ≤ 25 mots : décision → suite, style télégraphique clair) servent au mail de synthèse à la collègue de RI : ce qu'on retient en 5 secondes.
+- "contexte_court", "decision_courte", "suite_courte" alimentent le Word de synthèse (tableau concis, lu en 30 secondes) : phrases courtes, style médical télégraphique, sans redite.
+- "nom_entendu" : les noms épelés ou prononcés en séance NE SONT PAS masqués s'ils ne figurent pas dans la liste ; recopie-les tels qu'épelés.
 - "dossiers" : un élément par dossier discuté, dans l'ordre de passage. "patient" = le repère de la liste préparatoire qui correspond (âge, pathologie, localisation, nom prononcé) ; null si tu ne peux pas le rattacher avec une bonne certitude. Si un patient de la liste n'a pas été discuté, ne l'invente pas.
 - "missions" : UNIQUEMENT ce qui revient au Dr Lefevre ou à l'équipe de radiologie interventionnelle de Cochin (gestes à programmer, consultations pré-geste, examens d'imagerie à demander, avis à rendre, patient à rappeler). Pas les tâches des oncologues, chirurgiens ou radiothérapeutes. Phrases d'action courtes, à l'infinitif.
 - "mails" : un brouillon pour chaque action qui demande d'écrire à quelqu'un, en reprenant EXACTEMENT le style des mails du Dr Lefevre :
