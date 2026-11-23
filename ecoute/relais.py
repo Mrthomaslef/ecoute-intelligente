@@ -32,7 +32,8 @@ RELAIS = Path(os.environ.get(
 DRIVE_RELAIS = os.environ.get("ECOUTE_DRIVE_RELAIS", "gdrive:01 - Cochin (en cours)/EcouteIntelligente Relais")
 INTERVALLE_DRIVE = 30  # s entre deux consultations du dossier Drive (Mac mini)
 ATTENTE_NOTE = 3 * 60   # s : on attend une éventuelle note dictée juste après la consultation avant de rédiger
-ECART_NOTE = 20 * 60    # s : un enregistrement commencé moins de 20 min après la fin du précédent = même consultation
+ECART_NOTE = 10 * 60    # s : une note commence moins de 10 min après la fin de la consultation…
+DUREE_MAX_NOTE = 3 * 60  # s : … et dure au plus 3 min (au-delà, c'est une autre consultation)
 _dernier_drive = [0.0]
 
 DEPOT_IPHONE = Path(os.environ.get("ECOUTE_DEPOT_IPHONE", RELAIS.parent / "iPhone RCP"))
@@ -312,7 +313,9 @@ def grouper(prets: list[tuple[Path, dict]]) -> list[list[tuple[Path, dict]]]:
             groupes.append([item])
             continue
         prec = groupes[-1] if groupes and groupes[-1][-1][1].get("type", "cr") == "cr" else None
-        if prec and (bornes(item[1])[0] - bornes(prec[-1][1])[1]).total_seconds() <= ECART_NOTE:
+        debut_i, fin_i = bornes(item[1])
+        est_note = (fin_i - debut_i).total_seconds() <= DUREE_MAX_NOTE
+        if prec and est_note and (debut_i - bornes(prec[-1][1])[1]).total_seconds() <= ECART_NOTE:
             prec.append(item)
         else:
             groupes.append([item])

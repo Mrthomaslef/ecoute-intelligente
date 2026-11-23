@@ -191,3 +191,14 @@ class TestGroupesPrets(unittest.TestCase):
                  mock.patch.object(cli, "DOSSIER", rel), mock.patch.object(relais, "arrive_depuis", lambda w: 999):
                 g = relais.groupes_prets(180)
                 self.assertEqual([[w.name for w, _ in x] for x in g], [["2026-11-23_09h22_cr.m4a", "2026-11-23_09h27_cr.m4a"]])
+
+
+class TestNoteVsConsultationSuivante(unittest.TestCase):
+    def test_consultation_suivante_jamais_fusionnee(self):
+        from pathlib import Path
+        from ecoute import relais
+        cons = (Path("a.m4a"), {"debut": "2026-11-23T09:22:38", "fin": "2026-11-23T09:26:49", "type": "cr"})
+        note = (Path("b.m4a"), {"debut": "2026-11-23T09:27:03", "fin": "2026-11-23T09:27:42", "type": "cr"})
+        suivante = (Path("c.m4a"), {"debut": "2026-11-23T09:38:29", "fin": "2026-11-23T09:51:34", "type": "cr"})
+        g = relais.grouper([cons, note, suivante])
+        self.assertEqual([[p[0].name for p in x] for x in g], [["a.m4a", "b.m4a"], ["c.m4a"]])
