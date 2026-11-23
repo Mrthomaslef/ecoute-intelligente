@@ -362,6 +362,37 @@ def creer_brouillon(mail: dict) -> None:
         raise RuntimeError(r.stderr.strip()[-200:])
 
 
+# Synthèse Word de la RCP : brouillon (jamais envoyé) depuis le mail AP-HP, Word en pièce jointe.
+WORD_A = ["marie.talabard@aphp.fr"]  # Dr Marie-Pauline Talabard
+
+SCRIPT_BROUILLON_PJ = r'''
+on run argv
+  set {sujet, corps, expediteur, dest, pj} to {item 1 of argv, item 2 of argv, item 3 of argv, item 4 of argv, item 5 of argv}
+  tell application "Mail"
+    set m to make new outgoing message with properties {subject:sujet, content:corps & return & return, visible:false}
+    set sender of m to expediteur
+    tell m to make new to recipient at end of to recipients with properties {address:dest}
+    tell content of m to make new attachment with properties {file name:(POSIX file pj)} at after last paragraph
+    delay 2
+    save m
+    close m saving yes
+  end tell
+  return "ok"
+end run
+'''
+
+
+def brouillon_word(word: Path, jour: datetime, a: list[str] = WORD_A) -> None:
+    """Brouillon « Synthèse RCP JJ/MM » adressé à Marie-Pauline avec le Word joint (Thomas relit et envoie)."""
+    corps = (f"Bonjour Marie-Pauline,\n\nCi-joint la synthèse de la RCP du {jour:%d/%m/%Y}.\n\n"
+             "Bien amicalement,\nThomas")
+    for dest in a:
+        r = subprocess.run(["osascript", "-", f"Synthèse RCP du {jour:%d/%m/%Y}", corps, MOI, dest, str(word)],
+                           input=SCRIPT_BROUILLON_PJ, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip()[-200:])
+
+
 # ------------------------------------------------- Agenda RI (missions)
 def entrees_agenda(data: dict, patients: list[PatientRCP], mails: list[dict], jour: datetime) -> list[dict]:
     """Une entrée par patient dans « Questions perso » (Boîte Mail = RCP), actions regroupées."""
@@ -453,6 +484,12 @@ def suite_rcp(brut: str, jour: datetime, brouillons: bool = True, agenda_ri: boo
     try:
         ecrire_word(data, patients, jour, base)
         bilan["word"] = str(base)
+        if brouillons:
+            try:
+                brouillon_word(base, jour)
+                cli.log(f"RCP : brouillon (Word joint) préparé pour {', '.join(WORD_A)} — à envoyer par le Dr Lefevre.")
+            except Exception as e:  # noqa: BLE001
+                cli.log(f"RCP : brouillon Word non créé ({e}).")
         try:
             if drive:
                 bilan["drive"] = deposer_word_drive(base, dossier_drive, jour)
